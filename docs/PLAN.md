@@ -188,11 +188,11 @@ The rules the backend enforces. A refusal is a 409 with a plain message, unless 
 
 **Success criteria**
 
-- [ ] Vitest: the queue renders rows and status counts from a stubbed API. The claim page renders a decided claim, a waiting claim with no decision, and a claim waiting for sign-off. The instructions page renders. Money formats as `$1,250.00`
-- [ ] Playwright: the queue shows 25 claims and "Waiting 25". Clicking CLM-1001 opens its page, with the story, three items totaling $420.00, four documents and the Premium policy. The instructions page shows the instructions and the policy wording
-- [ ] In the browser, through the Playwright MCP server at localhost:5173 with `npm run dev` running: the queue, CLM-1001 (decided in Phase 4) and the instructions page look right in light and dark mode, in the brand fonts and colors, with no console errors
-- [ ] After `npm run check`, CLM-1001 is still decided in the development database, because the end-to-end run used its own
-- [ ] `npm run check` passes, with dashboard coverage at least 80%
+- [x] Vitest: the queue renders rows and status counts from a stubbed API. The claim page renders a decided claim, a waiting claim with no decision, and a claim waiting for sign-off. The instructions page renders. Money formats as `$1,250.00`
+- [x] Playwright: the queue shows 25 claims and "Waiting 25". Clicking CLM-1001 opens its page, with the story, three items totaling $420.00, four documents and the Premium policy. The instructions page shows the instructions and the policy wording
+- [x] In the browser, through the Playwright MCP server at localhost:5173 with `npm run dev` running: the queue, CLM-1001 (decided in Phase 4) and the instructions page look right in light and dark mode, in the brand fonts and colors, with no console errors
+- [x] After `npm run check`, CLM-1001 is still decided in the development database, because the end-to-end run used its own
+- [x] `npm run check` passes, with dashboard coverage at least 80%
 
 ## Phase 6: Live steps, sign-off and the first full run
 
