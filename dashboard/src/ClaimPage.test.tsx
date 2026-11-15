@@ -84,8 +84,11 @@ it("shows a payout that waits for sign-off", async () => {
   stubApi(claimRoutes(signOffClaim));
   render(<ClaimPage claimId="CLM-1003" />);
   expect(
-    await screen.findByText("$1,500.00 waits for a handler's sign-off"),
+    await screen.findByText(
+      "Payment of $1,500.00 waits for a handler's sign-off.",
+    ),
   ).toBeDefined();
+  expect(screen.getByText("Waits for a handler's sign-off")).toBeDefined();
   expect(screen.getByText("Waiting for sign-off")).toBeDefined();
 });
 

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { getJson } from "./api";
 
+/** How often live pages ask the API for news, in milliseconds. */
+export const REFRESH_MS = 2000;
+
 export interface Loaded<T> {
   data: T | undefined;
   error: string | undefined;

@@ -215,7 +215,9 @@ export function stubApi(routes: Routes) {
 export function claimRoutes(claim: Claim): Routes {
   return {
     [`/api/claims/${claim.claim_id}`]: claim,
+    [`/api/claims/${claim.claim_id}/steps`]: [],
     "/api/policies/POL-2001": policy,
     "/api/customers/CUS-3001/history": history,
+    "/api/handlers": handlers,
   };
 }

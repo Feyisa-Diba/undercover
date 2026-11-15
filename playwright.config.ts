@@ -11,6 +11,15 @@ export default defineConfig({
   outputDir: "e2e/test-results",
   reporter: "list",
   use: { baseURL: "http://localhost:5174" },
+  // Tests that change claims run after the ones that read the fresh queue.
+  projects: [
+    { name: "views", testIgnore: /actions\.spec\.ts/ },
+    {
+      name: "actions",
+      testMatch: /actions\.spec\.ts/,
+      dependencies: ["views"],
+    },
+  ],
   webServer: [
     {
       command:

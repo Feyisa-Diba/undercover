@@ -12,6 +12,7 @@ const moment = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+const clock = new Intl.DateTimeFormat("en-US", { timeStyle: "medium" });
 
 export const STATUSES: Status[] = [
   "waiting",
@@ -51,6 +52,11 @@ export function formatDate(iso: string): string {
 /** A moment such as 2026-11-15T22:29:04+00:00, shown in local time. */
 export function formatTime(iso: string): string {
   return moment.format(new Date(iso));
+}
+
+/** The time of day of a moment, such as 5:28:44 PM. */
+export function formatClock(iso: string): string {
+  return clock.format(new Date(iso));
 }
 
 /** A code such as trip_delay, shown as Trip delay. */

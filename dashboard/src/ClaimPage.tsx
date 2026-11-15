@@ -2,8 +2,9 @@ import { paths, type Claim } from "./api";
 import { HistoryPanel, PolicyPanel } from "./ClaimRecords";
 import { DecisionPanel } from "./DecisionPanel";
 import { formatDate, humanize, money } from "./format";
+import { StepsPanel } from "./StepsPanel";
 import { Loading, Problem, StatusChip } from "./ui";
-import { useApi } from "./useApi";
+import { REFRESH_MS, useApi } from "./useApi";
 
 function ClaimEvidence({ claim }: Readonly<{ claim: Claim }>) {
   return (
@@ -66,12 +67,16 @@ function ClaimEvidence({ claim }: Readonly<{ claim: Claim }>) {
 }
 
 export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
-  const { data: claim, error } = useApi<Claim>(paths.claim(claimId));
-  if (error) return <Problem message={error} />;
-  if (!claim) return <Loading />;
+  const {
+    data: claim,
+    error,
+    reload,
+  } = useApi<Claim>(paths.claim(claimId), REFRESH_MS);
+  if (!claim) return error ? <Problem message={error} /> : <Loading />;
 
   return (
     <>
+      {error && <Problem message={error} />}
       <a className="back" href="#/">
         Back to the queue
       </a>
@@ -88,7 +93,8 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
       </div>
       <div className="claim-grid">
         <div className="stack">
-          <DecisionPanel claim={claim} />
+          <DecisionPanel claim={claim} onChange={reload} />
+          <StepsPanel claimId={claim.claim_id} />
           <ClaimEvidence claim={claim} />
         </div>
         <aside className="stack">

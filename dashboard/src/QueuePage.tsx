@@ -1,15 +1,18 @@
 import { paths, type ClaimSummary } from "./api";
 import { STATUSES, STATUS_LABELS, formatDate, humanize, money } from "./format";
 import { DecisionChip, Loading, Problem, StatusChip } from "./ui";
-import { useApi } from "./useApi";
+import { REFRESH_MS, useApi } from "./useApi";
 
 export function QueuePage() {
-  const { data: claims, error } = useApi<ClaimSummary[]>(paths.claims);
-  if (error) return <Problem message={error} />;
-  if (!claims) return <Loading />;
+  const { data: claims, error } = useApi<ClaimSummary[]>(
+    paths.claims,
+    REFRESH_MS,
+  );
+  if (!claims) return error ? <Problem message={error} /> : <Loading />;
 
   return (
     <>
+      {error && <Problem message={error} />}
       <div className="page-head">
         <h1>Claims queue</h1>
       </div>

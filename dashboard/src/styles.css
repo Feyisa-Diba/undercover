@@ -445,3 +445,136 @@ tbody tr + tr th {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The agent's steps */
+.steps {
+  display: grid;
+  gap: 2px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  padding: 8px 0 8px 22px;
+}
+
+.step::before {
+  position: absolute;
+  top: 15px;
+  left: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+}
+
+.step-call::before {
+  background: var(--cerulean);
+}
+
+.step-message::before {
+  background: var(--sea-green);
+}
+
+.step p {
+  margin: 0;
+}
+
+.step code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+}
+
+.step .args {
+  margin-left: 8px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.step-message p {
+  font-weight: 500;
+}
+
+.step-time {
+  margin-left: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+.step summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.step pre {
+  max-height: 320px;
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--sunken);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow: auto;
+}
+
+/* Sign-off */
+.sign-off {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--sunken);
+}
+
+.sign-off-note {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.sign-off-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.sign-off select,
+.sign-off button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.sign-off select {
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.sign-off button {
+  border: 0;
+  background: var(--midnight);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sign-off button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sign-off button {
+    background: var(--sea-mist);
+    color: var(--midnight);
+  }
+}
+
+.sign-off .problem {
+  margin: 12px 0 0;
+}

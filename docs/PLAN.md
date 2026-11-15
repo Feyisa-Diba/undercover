@@ -206,14 +206,14 @@ The rules the backend enforces. A refusal is a 409 with a plain message, unless 
 
 **Success criteria**
 
-- [ ] Vitest: steps render in order with results folded, and polling picks up a new step. Sign-off posts the chosen handler and shows the payment, and a refused sign-off shows the API's message
-- [ ] Playwright: steps posted through the API to a claim in progress appear on its page without a reload
-- [ ] Playwright: a claim approved at $1,500.00 through the API shows "Waiting for sign-off". Signing off as Dana Whitfield then shows "Decided", "Paid $1,500.00" and "Signed off by Dana Whitfield"
-- [ ] The full run on the real model: after `uv run -m backend.seed` and `npm run dev`, `uv run -m agent` works all 25 claims, and every claim ends `decided` or `waiting_for_sign_off`
-- [ ] During that run, through the Playwright MCP server: a claim moves from Waiting to In progress to Decided on the queue, and its page shows the steps arriving one by one
-- [ ] No claim waiting for sign-off has a payment, and every approved claim at or under $1,000 is paid
-- [ ] One claim is signed off in the browser, and it then shows as Decided and paid
-- [ ] `npm run check` passes, and I report the results with the run's counts of approvals, declines, referrals and claims waiting for sign-off
+- [x] Vitest: steps render in order with results folded, and polling picks up a new step. Sign-off posts the chosen handler and shows the payment, and a refused sign-off shows the API's message
+- [x] Playwright: steps posted through the API to a claim in progress appear on its page without a reload
+- [x] Playwright: a claim approved at $1,500.00 through the API shows "Waiting for sign-off". Signing off as Dana Whitfield then shows "Decided", "Paid $1,500.00" and "Signed off by Dana Whitfield"
+- [x] The full run on the real model: after `uv run -m backend.seed` and `npm run dev`, `uv run -m agent` works all 25 claims, and every claim ends `decided` or `waiting_for_sign_off`
+- [x] During that run, through the Playwright MCP server: a claim moves from Waiting to In progress to Decided on the queue, and its page shows the steps arriving as it works (the agent posts them faster than the two-second refresh, so they arrive a few at a time)
+- [x] No claim waiting for sign-off has a payment, and every approved claim at or under $1,000 is paid
+- [x] One claim is signed off in the browser, and it then shows as Decided and paid
+- [x] `npm run check` passes, and I report the results with the run's counts of approvals, declines, referrals and claims waiting for sign-off
 
 ## Not in this plan
 

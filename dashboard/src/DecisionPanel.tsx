@@ -1,5 +1,6 @@
 import type { Claim, Decision } from "./api";
 import { formatTime, money } from "./format";
+import { SignOff, SignedOff } from "./SignOff";
 import { DecisionChip } from "./ui";
 
 function paymentText(claim: Claim, decision: Decision): string {
@@ -7,12 +8,15 @@ function paymentText(claim: Claim, decision: Decision): string {
     return `Paid ${money(claim.payment.amount)} on ${formatTime(claim.payment.paid_at)}`;
   }
   if (claim.status === "waiting_for_sign_off") {
-    return `${money(decision.payout)} waits for a handler's sign-off`;
+    return "Waits for a handler's sign-off";
   }
   return decision.decision === "approve" ? "Not paid yet" : "Nothing to pay";
 }
 
-export function DecisionPanel({ claim }: Readonly<{ claim: Claim }>) {
+export function DecisionPanel({
+  claim,
+  onChange,
+}: Readonly<{ claim: Claim; onChange: () => void }>) {
   const { decision } = claim;
   if (!decision) {
     return (
@@ -42,7 +46,25 @@ export function DecisionPanel({ claim }: Readonly<{ claim: Claim }>) {
         <dd>{formatTime(decision.decided_at)}</dd>
         <dt>Payment</dt>
         <dd>{paymentText(claim, decision)}</dd>
+        {decision.signed_off_by && decision.signed_off_at && (
+          <>
+            <dt>Sign-off</dt>
+            <dd>
+              <SignedOff
+                handlerId={decision.signed_off_by}
+                at={decision.signed_off_at}
+              />
+            </dd>
+          </>
+        )}
       </dl>
+      {claim.status === "waiting_for_sign_off" && (
+        <SignOff
+          claimId={claim.claim_id}
+          payout={decision.payout}
+          onSignedOff={onChange}
+        />
+      )}
     </section>
   );
 }
