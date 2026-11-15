@@ -79,15 +79,15 @@ An unknown id returns 404 with a message, such as `Claim CLM-9999 not found`.
 
 **Success criteria** (each checked by a TestClient test, and with curl against `npm run dev:backend`)
 
-- [ ] `GET /api/claims` returns 25 rows, CLM-1001 to CLM-1025, all `waiting`, with decision and payout `null`. CLM-1001's customer is Maya Patel
-- [ ] `GET /api/claims/CLM-1001` returns an amount claimed of 420.0, three items, four documents, status `waiting`, and `null` for decision and payment
-- [ ] `GET /api/claims/CLM-9999` returns 404 with `{"detail": "Claim CLM-9999 not found"}`
-- [ ] `GET /api/policies/POL-2001` returns plan `premium`, a trip from 2026-06-10 to 2026-06-18 and a trip cost of 3100.0
-- [ ] `GET /api/customers/CUS-3001/history` returns Maya Patel with one earlier claim, CLM-0412, and has no `email`, `phone`, `address` or `date_of_birth` keys
-- [ ] `GET /api/policy-wording` returns version `2026.1` and text starting with `# UnderCover Travel Insurance: Policy Wording`
-- [ ] `GET /api/handlers` returns three handlers
-- [ ] A test walks `app.openapi()` and confirms every operation has an operation id, a one-line description, and no optional parameters or body fields
-- [ ] `npm run check` passes
+- [x] `GET /api/claims` returns 25 rows, CLM-1001 to CLM-1025, all `waiting`, with decision and payout `null`. CLM-1001's customer is Maya Patel
+- [x] `GET /api/claims/CLM-1001` returns an amount claimed of 420.0, three items, four documents, status `waiting`, and `null` for decision and payment
+- [x] `GET /api/claims/CLM-9999` returns 404 with `{"detail": "Claim CLM-9999 not found"}`
+- [x] `GET /api/policies/POL-2001` returns plan `premium`, a trip from 2026-06-10 to 2026-06-18 and a trip cost of 3100.0
+- [x] `GET /api/customers/CUS-3001/history` returns Maya Patel with one earlier claim, CLM-0412, and has no `email`, `phone`, `address` or `date_of_birth` keys
+- [x] `GET /api/policy-wording` returns version `2026.1` and text starting with `# UnderCover Travel Insurance: Policy Wording`
+- [x] `GET /api/handlers` returns three handlers
+- [x] A test walks `app.openapi()` and confirms every operation has an operation id, a one-line description, and no optional parameters or body fields
+- [x] `npm run check` passes
 
 ## Phase 3: Decisions, payments and sign-off
 

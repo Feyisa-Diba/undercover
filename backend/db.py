@@ -5,7 +5,9 @@ import os
 import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+
+from fastapi import Depends
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -86,6 +88,9 @@ def session() -> Iterator[sqlite3.Connection]:
             yield connection
     finally:
         connection.close()
+
+
+Db = Annotated[sqlite3.Connection, Depends(session)]
 
 
 def read_json(name: str) -> Any:
