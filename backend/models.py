@@ -144,6 +144,10 @@ class PolicyWording(BaseModel):
     text: str
 
 
+class Instructions(BaseModel):
+    text: str
+
+
 class Handler(BaseModel):
     handler_id: str
     name: str

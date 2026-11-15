@@ -85,3 +85,9 @@ def test_list_handlers():
         "Priya Raman",
     ]
     assert "email" not in handlers[0]
+
+
+def test_get_instructions():
+    text = client.get("/api/instructions").json()["text"]
+    assert text.startswith("# The UnderCover Agent")
+    assert text.endswith("The policy wording follows.\n")

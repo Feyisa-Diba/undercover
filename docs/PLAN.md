@@ -159,16 +159,16 @@ The rules the backend enforces. A refusal is a 409 with a plain message, unless 
 
 **Success criteria**
 
-- [ ] Stub-model test, approving under the limit (CLM-1001, $420.00): the claim is `decided`, the payment is 420.0, and the steps list each call, each result and the final message, in order
-- [ ] Stub-model test, approving over the limit (CLM-1003, $1,500.00) and then trying to pay: the tool result says the payment needs sign-off, the claim is `waiting_for_sign_off`, and there's no payment
-- [ ] Stub-model test, a decline: the claim is `decided` with a payout of $0 and no payment
-- [ ] Test: no tool takes a claim id, policy id or customer id
-- [ ] Test: the system prompt holds the instructions and the policy wording, both fetched from the API
-- [ ] Test: the queue runner works the waiting claims and skips the decided ones, with `run` stubbed
-- [ ] `GET /api/instructions` returns the text of `backend/instructions.md`
-- [ ] `git grep -n -e "open(" -e "data/" -- agent` prints nothing: the agent reads no files
-- [ ] One claim on the real model: with a fresh seed and `npm run dev:backend` running, `uv run -m agent CLM-1001` prints a decision. `GET /api/claims/CLM-1001` shows a decision with an explanation of two or three sentences and a policy section, and `GET /api/claims/CLM-1001/steps` lists the steps
-- [ ] `npm run check` passes
+- [x] Stub-model test, approving under the limit (CLM-1001, $420.00): the claim is `decided`, the payment is 420.0, and the steps list each call, each result and the final message, in order
+- [x] Stub-model test, approving over the limit (CLM-1003, $1,500.00) and then trying to pay: the tool result says the payment needs sign-off, the claim is `waiting_for_sign_off`, and there's no payment
+- [x] Stub-model test, a decline: the claim is `decided` with a payout of $0 and no payment
+- [x] Test: no tool takes a claim id, policy id or customer id
+- [x] Test: the system prompt holds the instructions and the policy wording, both fetched from the API
+- [x] Test: the queue runner works the waiting claims and skips the decided ones, with `run` stubbed
+- [x] `GET /api/instructions` returns the text of `backend/instructions.md`
+- [x] `git grep -n -e "open(" -e "data/" -- agent` prints nothing: the agent reads no files
+- [x] One claim on the real model: with a fresh seed and `npm run dev:backend` running, `uv run -m agent CLM-1001` prints a decision. `GET /api/claims/CLM-1001` shows a decision with an explanation of two or three sentences and a policy section, and `GET /api/claims/CLM-1001/steps` lists the steps
+- [x] `npm run check` passes
 
 ## Phase 5: The dashboard: the queue, the claim and the instructions
 

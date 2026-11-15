@@ -3,6 +3,7 @@
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -12,12 +13,15 @@ from backend.models import (
     ClaimHistory,
     ClaimSummary,
     Handler,
+    Instructions,
     Policy,
     PolicyWording,
 )
 from backend.records import COMPANY, HANDLERS, POLICY_WORDING, find, load_claim
 from backend.seed import reset
 from backend.workflow import router
+
+INSTRUCTIONS = Path(__file__).with_name("instructions.md")
 
 QUEUE = """
 SELECT
@@ -85,6 +89,12 @@ def get_claim_history(customer_id: str, db: Db) -> ClaimHistory:
 def get_policy_wording() -> PolicyWording:
     """Get the policy wording that decisions follow."""
     return PolicyWording(version=COMPANY["policy_wording_version"], text=POLICY_WORDING)
+
+
+@app.get("/api/instructions", operation_id="get_instructions")
+def get_instructions() -> Instructions:
+    """Get the agent's instructions, read only."""
+    return Instructions(text=INSTRUCTIONS.read_text(encoding="utf-8"))
 
 
 @app.get("/api/handlers", operation_id="list_handlers")
