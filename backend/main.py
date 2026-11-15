@@ -17,6 +17,7 @@ from backend.models import (
 )
 from backend.records import COMPANY, HANDLERS, POLICY_WORDING, find, load_claim
 from backend.seed import reset
+from backend.workflow import router
 
 QUEUE = """
 SELECT
@@ -44,6 +45,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="UnderCover", lifespan=lifespan)
+app.include_router(router)
 
 
 @app.get("/api/health", operation_id="health")

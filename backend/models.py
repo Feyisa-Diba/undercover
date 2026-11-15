@@ -1,11 +1,49 @@
 """The shapes the API reads and returns."""
 
-from typing import Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 Status = Literal["waiting", "in_progress", "waiting_for_sign_off", "decided"]
 DecisionKind = Literal["approve", "decline", "refer"]
+StepKind = Literal["call", "result", "message"]
+
+
+class StartClaim(BaseModel):
+    thread_id: str
+
+
+class NewStep(BaseModel):
+    thread_id: str
+    kind: StepKind
+    title: str
+    detail: str
+
+
+class Step(NewStep):
+    step_id: int
+    created_at: str
+
+
+class NewDecision(BaseModel):
+    explanation: str
+    policy_section: str
+    decision: DecisionKind
+    payout: Annotated[float, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def only_approvals_pay(self) -> Self:
+        if self.decision != "approve" and self.payout != 0:
+            raise ValueError("A decline or a referral pays $0.00.")
+        return self
+
+
+class NewPayment(BaseModel):
+    amount: Annotated[float, Field(gt=0)]
+
+
+class SignOff(BaseModel):
+    handler_id: str
 
 
 class Item(BaseModel):

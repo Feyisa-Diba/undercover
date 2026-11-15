@@ -121,17 +121,17 @@ The rules the backend enforces. A refusal is a 409 with a plain message, unless 
 
 **Success criteria**
 
-- [ ] Tests cover each move between statuses and each refusal above. That includes paying before a decision, paying a declined claim, paying a different amount, paying twice, deciding twice, signing off a claim that isn't waiting, an unknown handler, and a handler who can't approve over the limit
-- [ ] Tests at the limit: approving $1,000.00 goes straight to `decided` and can be paid, and approving $1,000.01 goes to `waiting_for_sign_off` and can't be paid
-- [ ] With `npm run dev:backend` running on a fresh seed, these calls give these responses:
+- [x] Tests cover each move between statuses and each refusal above. That includes paying before a decision, paying a declined claim, paying a different amount, paying twice, deciding twice, signing off a claim that isn't waiting, an unknown handler, and a handler who can't approve over the limit
+- [x] Tests at the limit: approving $1,000.00 goes straight to `decided` and can be paid, and approving $1,000.01 goes to `waiting_for_sign_off` and can't be paid
+- [x] With `npm run dev:backend` running on a fresh seed, these calls give these responses:
   - `POST /api/claims/CLM-1003/start` with `{"thread_id": "check-1"}` → status `in_progress`
   - `POST /api/claims/CLM-1003/decision` approving $1,500.00 → status `waiting_for_sign_off`
   - `POST /api/claims/CLM-1003/payment` with `{"amount": 1500}` → 409, `Payment of $1,500.00 needs a handler's sign-off.`
   - `POST /api/claims/CLM-1003/sign-off` with `{"handler_id": "HND-01"}` → status `decided`, a payment of 1500.0, signed off by HND-01
   - the same payment again → 409, already paid
   - then `uv run -m backend.seed` to reset the queue
-- [ ] The OpenAPI test passes with the new operations
-- [ ] `npm run check` passes
+- [x] The OpenAPI test passes with the new operations
+- [x] `npm run check` passes
 
 ## Phase 4: The UnderCover Agent
 
