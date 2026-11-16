@@ -35,7 +35,8 @@ CREATE TABLE claims (
     customer_id TEXT NOT NULL REFERENCES customers,
     record TEXT NOT NULL,
     status TEXT NOT NULL,
-    thread_id TEXT
+    thread_id TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE decisions (
     claim_id TEXT PRIMARY KEY REFERENCES claims,
@@ -59,9 +60,18 @@ CREATE TABLE steps (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cap INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    summary TEXT,
+    todos TEXT NOT NULL
+);
 CREATE VIEW claim_view AS
 SELECT
     claims.claim_id, claims.record, claims.status, claims.thread_id,
+    claims.attempts,
     customers.name AS customer_name,
     decisions.decision, decisions.payout, decisions.section, decisions.reason,
     decisions.decided_at,
@@ -121,7 +131,8 @@ def seed(path: Path) -> dict[str, int]:
             [(p["policy_id"], json.dumps(p)) for p in policies],
         )
         connection.executemany(
-            "INSERT INTO claims VALUES (?, ?, ?, 'waiting', NULL)",
+            "INSERT INTO claims (claim_id, customer_id, record, status)"
+            " VALUES (?, ?, ?, 'waiting')",
             [(c["claim_id"], c["customer_id"], json.dumps(c)) for c in claims],
         )
     return {

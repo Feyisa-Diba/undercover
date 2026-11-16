@@ -16,19 +16,26 @@ from backend.models import (
     ClaimSummary,
     Decision,
     DecisionRequest,
+    FinishRequest,
     Handler,
     Instructions,
     Payment,
     PaymentRequest,
     Policy,
     PreviousClaim,
+    ReleaseRequest,
+    Run,
+    RunRequest,
     SignOffRequest,
     StartRequest,
     Step,
+    StepKind,
     StepRequest,
+    TodosRequest,
 )
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+MAX_ATTEMPTS = 2
 
 
 @asynccontextmanager
@@ -103,6 +110,7 @@ def to_claim(row: sqlite3.Row) -> Claim:
             "status": row["status"],
             "customer_name": row["customer_name"],
             "thread_id": row["thread_id"],
+            "attempts": row["attempts"],
             "decision": decision,
             "payment": payment,
         }
@@ -119,6 +127,39 @@ def pay(
         (claim_id, payment.amount, payment.paid_at, payment.signed_off_by),
     )
     return payment
+
+
+def add_step(
+    db: sqlite3.Connection, claim_id: str, thread_id: str, kind: StepKind, content: str
+) -> Step:
+    """Record one step of the agent's work on a claim."""
+    row = db.execute(
+        "INSERT INTO steps (claim_id, thread_id, kind, content, created_at)"
+        " VALUES (?, ?, ?, ?, ?) RETURNING *",
+        (claim_id, thread_id, kind, content, now()),
+    ).fetchone()
+    return Step(**dict(row))
+
+
+def find_run(db: sqlite3.Connection, run_id: int) -> sqlite3.Row:
+    """Return one run's row, or raise a 404."""
+    row = db.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    return row
+
+
+def find_open_run(db: sqlite3.Connection, run_id: int) -> sqlite3.Row:
+    """Return a run that hasn't finished, or raise a 404 or a 409."""
+    row = find_run(db, run_id)
+    if row["finished_at"] is not None:
+        raise HTTPException(409, f"Run {run_id} has finished")
+    return row
+
+
+def to_run(row: sqlite3.Row) -> Run:
+    """Build a run, with its to-do list, from its row."""
+    return Run(**dict(row) | {"todos": json.loads(row["todos"])})
 
 
 @app.get("/api/health", operation_id="health")
@@ -184,9 +225,22 @@ def start_claim(claim_id: str, request: StartRequest, db: Database) -> Claim:
     if find_claim(db, claim_id)["status"] != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is not waiting")
     db.execute(
-        "UPDATE claims SET status = 'in_progress', thread_id = ? WHERE claim_id = ?",
+        "UPDATE claims SET status = 'in_progress', thread_id = ?,"
+        " attempts = attempts + 1 WHERE claim_id = ?",
         (request.thread_id, claim_id),
     )
+    return to_claim(find_claim(db, claim_id))
+
+
+@app.post("/api/claims/{claim_id}/release", operation_id="release_claim")
+def release_claim(claim_id: str, request: ReleaseRequest, db: Database) -> Claim:
+    """Put a failed claim back in the queue, or for a handler after two tries."""
+    claim = find_claim(db, claim_id)
+    if claim["status"] != "in_progress":
+        raise HTTPException(409, f"Claim {claim_id} is not in progress")
+    add_step(db, claim_id, claim["thread_id"], "error", request.reason)
+    status = "waiting" if claim["attempts"] < MAX_ATTEMPTS else "left_for_handler"
+    db.execute("UPDATE claims SET status = ? WHERE claim_id = ?", (status, claim_id))
     return to_claim(find_claim(db, claim_id))
 
 
@@ -196,12 +250,7 @@ def record_step(claim_id: str, request: StepRequest, db: Database) -> Step:
     thread_id = find_claim(db, claim_id)["thread_id"]
     if thread_id is None:
         raise HTTPException(409, f"Claim {claim_id} has not been started")
-    row = db.execute(
-        "INSERT INTO steps (claim_id, thread_id, kind, content, created_at)"
-        " VALUES (?, ?, ?, ?, ?) RETURNING *",
-        (claim_id, thread_id, request.kind, request.content, now()),
-    ).fetchone()
-    return Step(**dict(row))
+    return add_step(db, claim_id, thread_id, request.kind, request.content)
 
 
 @app.get("/api/claims/{claim_id}/steps", operation_id="list_steps")
@@ -272,3 +321,40 @@ def sign_off_claim(claim_id: str, request: SignOffRequest, db: Database) -> Clai
     pay(db, claim_id, claim["payout"], handler.name)
     db.execute("UPDATE claims SET status = 'decided' WHERE claim_id = ?", (claim_id,))
     return to_claim(find_claim(db, claim_id))
+
+
+@app.post("/api/runs", operation_id="start_run")
+def start_run(request: RunRequest, db: Database) -> Run:
+    """Start a run of the agent on the queue, with an empty to-do list."""
+    row = db.execute(
+        "INSERT INTO runs (cap, started_at, todos) VALUES (?, ?, '[]') RETURNING *",
+        (request.cap, now()),
+    ).fetchone()
+    return to_run(row)
+
+
+@app.get("/api/runs", operation_id="list_runs")
+def list_runs(db: Database) -> list[Run]:
+    """List the agent's runs with their to-do lists, newest first."""
+    rows = db.execute("SELECT * FROM runs ORDER BY run_id DESC").fetchall()
+    return [to_run(row) for row in rows]
+
+
+@app.put("/api/runs/{run_id}/todos", operation_id="write_todos")
+def write_todos(run_id: int, request: TodosRequest, db: Database) -> Run:
+    """Replace the to-do list of a run that hasn't finished."""
+    find_open_run(db, run_id)
+    todos = json.dumps([todo.model_dump() for todo in request.todos])
+    db.execute("UPDATE runs SET todos = ? WHERE run_id = ?", (todos, run_id))
+    return to_run(find_run(db, run_id))
+
+
+@app.post("/api/runs/{run_id}/finish", operation_id="finish_run")
+def finish_run(run_id: int, request: FinishRequest, db: Database) -> Run:
+    """Finish a run with a short summary for the handlers."""
+    find_open_run(db, run_id)
+    db.execute(
+        "UPDATE runs SET finished_at = ?, summary = ? WHERE run_id = ?",
+        (now(), request.summary, run_id),
+    )
+    return to_run(find_run(db, run_id))
