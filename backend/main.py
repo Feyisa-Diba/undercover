@@ -1,6 +1,7 @@
 """The UnderCover backend."""
 
 import json
+import re
 import sqlite3
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing
@@ -23,9 +24,13 @@ from backend.models import (
     PaymentRequest,
     Policy,
     PreviousClaim,
+    ReadRequest,
     ReleaseRequest,
     Run,
     RunRequest,
+    SearchResult,
+    Section,
+    SectionRef,
     SignOffRequest,
     StartRequest,
     Step,
@@ -36,6 +41,9 @@ from backend.models import (
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
 MAX_ATTEMPTS = 2
+SEARCH_RESULTS = 5
+SHORTEST_WORD = 3
+COMMON_WORDS = {"the", "and", "for", "with", "was", "are", "not", "you", "your", "our"}
 
 
 @asynccontextmanager
@@ -96,8 +104,15 @@ def to_summary(row: sqlite3.Row) -> ClaimSummary:
     )
 
 
-def to_claim(row: sqlite3.Row) -> Claim:
-    """Build a claim in full, with its decision and payment, from its row."""
+def load_claim(db: sqlite3.Connection, claim_id: str) -> Claim:
+    """Return a claim in full: its decision, payment and the sections read for it."""
+    row = find_claim(db, claim_id)
+    reads = db.execute(
+        "SELECT sections.document, sections.section, sections.title"
+        " FROM reads JOIN sections USING (document, section)"
+        " WHERE claim_id = ? GROUP BY document, section ORDER BY MIN(read_id)",
+        (claim_id,),
+    ).fetchall()
     decision = None
     if row["decision"] is not None:
         decision = Decision(**{field: row[field] for field in Decision.model_fields})
@@ -113,6 +128,7 @@ def to_claim(row: sqlite3.Row) -> Claim:
             "attempts": row["attempts"],
             "decision": decision,
             "payment": payment,
+            "sections_read": [SectionRef(**dict(read)) for read in reads],
         }
     )
 
@@ -178,7 +194,7 @@ def list_claims(db: Database) -> list[ClaimSummary]:
 @app.get("/api/claims/{claim_id}", operation_id="get_claim")
 def get_claim(claim_id: str, db: Database) -> Claim:
     """Get one claim in full: the story, the items claimed and the documents."""
-    return to_claim(find_claim(db, claim_id))
+    return load_claim(db, claim_id)
 
 
 @app.get("/api/policies/{policy_id}", operation_id="get_policy")
@@ -212,6 +228,58 @@ def get_instructions(db: Database) -> Instructions:
     return Instructions(text=f"{INSTRUCTIONS.read_text(encoding='utf-8')}\n{wording}")
 
 
+@app.get("/api/sections", operation_id="list_sections")
+def list_sections(db: Database) -> list[SectionRef]:
+    """List the sections of the policy wording and the claims manual."""
+    rows = db.execute("SELECT document, section, title FROM sections ORDER BY rowid")
+    return [SectionRef(**dict(row)) for row in rows]
+
+
+@app.get("/api/sections/search", operation_id="search_sections")
+def search_sections(query: str, db: Database) -> list[SearchResult]:
+    """Find the sections of the wording and the manual that use a query's words."""
+    words = {
+        word
+        for word in re.findall(r"[a-z0-9]+", query.lower())
+        if len(word) >= SHORTEST_WORD and word not in COMMON_WORDS
+    }
+    found = []
+    for row in db.execute("SELECT * FROM sections ORDER BY rowid"):
+        text = f"{row['title']}\n{row['text']}".lower()
+        score = sum(word in text for word in words)
+        if score:
+            matches = [
+                paragraph
+                for paragraph in row["text"].splitlines()
+                if any(word in paragraph.lower() for word in words)
+            ]
+            ref = {key: row[key] for key in ("document", "section", "title")}
+            found.append((score, SearchResult(**ref, matches=matches)))
+    found.sort(key=lambda scored: -scored[0])
+    return [result for _, result in found[:SEARCH_RESULTS]]
+
+
+@app.post("/api/claims/{claim_id}/reads", operation_id="read_section")
+def read_section(claim_id: str, request: ReadRequest, db: Database) -> Section:
+    """Read a section of the wording or the manual, and note it on the claim."""
+    claim = find_claim(db, claim_id)
+    if claim["status"] != "in_progress":
+        raise HTTPException(409, f"Claim {claim_id} is not in progress")
+    row = db.execute(
+        "SELECT * FROM sections WHERE document = ? AND section = ?",
+        (request.document, request.section),
+    ).fetchone()
+    if row is None:
+        document = request.document.replace("_", " ")
+        raise HTTPException(404, f"The {document} has no section {request.section}")
+    db.execute(
+        "INSERT INTO reads (claim_id, thread_id, document, section, read_at)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (claim_id, claim["thread_id"], request.document, request.section, now()),
+    )
+    return Section(**dict(row))
+
+
 @app.get("/api/handlers", operation_id="list_handlers")
 def list_handlers(db: Database) -> list[Handler]:
     """List the claims handlers."""
@@ -229,7 +297,7 @@ def start_claim(claim_id: str, request: StartRequest, db: Database) -> Claim:
         " attempts = attempts + 1 WHERE claim_id = ?",
         (request.thread_id, claim_id),
     )
-    return to_claim(find_claim(db, claim_id))
+    return load_claim(db, claim_id)
 
 
 @app.post("/api/claims/{claim_id}/release", operation_id="release_claim")
@@ -241,7 +309,7 @@ def release_claim(claim_id: str, request: ReleaseRequest, db: Database) -> Claim
     add_step(db, claim_id, claim["thread_id"], "error", request.reason)
     status = "waiting" if claim["attempts"] < MAX_ATTEMPTS else "left_for_handler"
     db.execute("UPDATE claims SET status = ? WHERE claim_id = ?", (status, claim_id))
-    return to_claim(find_claim(db, claim_id))
+    return load_claim(db, claim_id)
 
 
 @app.post("/api/claims/{claim_id}/steps", operation_id="record_step")
@@ -278,7 +346,7 @@ def record_decision(claim_id: str, request: DecisionRequest, db: Database) -> Cl
         "UPDATE claims SET status = ? WHERE claim_id = ?",
         ("waiting_for_sign_off" if held else "decided", claim_id),
     )
-    return to_claim(find_claim(db, claim_id))
+    return load_claim(db, claim_id)
 
 
 @app.post("/api/claims/{claim_id}/payment", operation_id="pay_claim")
@@ -320,7 +388,7 @@ def sign_off_claim(claim_id: str, request: SignOffRequest, db: Database) -> Clai
         )
     pay(db, claim_id, claim["payout"], handler.name)
     db.execute("UPDATE claims SET status = 'decided' WHERE claim_id = ?", (claim_id,))
-    return to_claim(find_claim(db, claim_id))
+    return load_claim(db, claim_id)
 
 
 @app.post("/api/runs", operation_id="start_run")

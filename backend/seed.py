@@ -9,8 +9,8 @@ def main() -> None:
     counts = seed(path)
     print(
         f"Seeded {counts['claims']} claims, {counts['policies']} policies, "
-        f"{counts['customers']} customers and {counts['handlers']} handlers "
-        f"into {path.name}"
+        f"{counts['customers']} customers, {counts['handlers']} handlers "
+        f"and {counts['sections']} sections into {path.name}"
     )
 
 

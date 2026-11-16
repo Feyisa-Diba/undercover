@@ -33,6 +33,7 @@ def test_get_claim(client):
     assert claim["status"] == "waiting"
     assert claim["decision"] is None
     assert claim["payment"] is None
+    assert claim["sections_read"] == []
 
 
 def test_get_policy(client):
@@ -65,8 +66,8 @@ def test_unknown_ids(client):
 def test_seed_command(capsys):
     seed.main()
     assert capsys.readouterr().out == (
-        "Seeded 25 claims, 50 policies, 49 customers and 3 handlers "
-        "into undercover.db\n"
+        "Seeded 25 claims, 50 policies, 49 customers, 3 handlers "
+        "and 26 sections into undercover.db\n"
     )
 
 

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
+DOCUMENTS = {"policy_wording": "policy_wording.md", "claims_manual": "claims_manual.md"}
+HEADING = re.compile(r"^## (\d+)\. (.+)$", re.MULTILINE)
 
 SCHEMA = """
 CREATE TABLE settings (
@@ -60,6 +63,21 @@ CREATE TABLE steps (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE sections (
+    document TEXT NOT NULL,
+    section INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (document, section)
+);
+CREATE TABLE reads (
+    read_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    claim_id TEXT NOT NULL REFERENCES claims,
+    thread_id TEXT NOT NULL,
+    document TEXT NOT NULL,
+    section INTEGER NOT NULL,
+    read_at TEXT NOT NULL
+);
 CREATE TABLE runs (
     run_id INTEGER PRIMARY KEY AUTOINCREMENT,
     cap INTEGER NOT NULL,
@@ -100,6 +118,16 @@ def load(name: str) -> Any:
     return json.loads((DATA / name).read_text(encoding="utf-8"))
 
 
+def split_sections(markdown: str) -> list[tuple[int, str, str]]:
+    """Split a document on its "## N. Title" headings into number, title and text."""
+    headings = list(HEADING.finditer(markdown))
+    ends = [heading.start() for heading in headings[1:]] + [len(markdown)]
+    return [
+        (int(heading[1]), heading[2], markdown[heading.end() : end].strip())
+        for heading, end in zip(headings, ends, strict=True)
+    ]
+
+
 def seed(path: Path) -> dict[str, int]:
     """Build a fresh database at path from data/ and count what it holds."""
     company = load("company.json")
@@ -108,6 +136,11 @@ def seed(path: Path) -> dict[str, int]:
     policies = load("policies.json")
     claims = load("claims.json")
     wording = (DATA / "policy_wording.md").read_text(encoding="utf-8")
+    sections = [
+        (document, *section)
+        for document, name in DOCUMENTS.items()
+        for section in split_sections((DATA / name).read_text(encoding="utf-8"))
+    ]
     path.unlink(missing_ok=True)
     with closing(sqlite3.connect(path)) as connection, connection:
         connection.executescript(SCHEMA)
@@ -135,9 +168,11 @@ def seed(path: Path) -> dict[str, int]:
             " VALUES (?, ?, ?, 'waiting')",
             [(c["claim_id"], c["customer_id"], json.dumps(c)) for c in claims],
         )
+        connection.executemany("INSERT INTO sections VALUES (?, ?, ?, ?)", sections)
     return {
         "claims": len(claims),
         "policies": len(policies),
         "customers": len(customers),
         "handlers": len(handlers),
+        "sections": len(sections),
     }

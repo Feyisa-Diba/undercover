@@ -160,14 +160,14 @@ Backend only. Add `attempts` and the `left_for_handler` state, `release_claim` a
 
 Backend only. Seed the `sections` table, add `list_sections`, `search_sections` and `read_section`, record reads, and add `sections_read` to `get_claim`.
 
-- [ ] `uv run -m backend.seed` prints `Seeded 25 claims, 50 policies, 49 customers, 3 handlers and 26 sections into undercover.db`
-- [ ] `curl -s localhost:8000/api/sections` returns 26 sections, 12 of `policy_wording` and 14 of `claims_manual`. Wording section 10 is "How we work out your payment" and manual section 9 is "Repeat claims"
-- [ ] `curl -s "localhost:8000/api/sections/search?query=giraffe"` returns manual section 7, "Interpretation notes", with the paragraph on wild animals. A word that appears nowhere returns an empty list
-- [ ] `read_section` for wording section 3 on `CLM-1001` after `start_claim` returns "Trip Delay" and its full text. On a waiting claim it returns 409, for section 99 it returns 404, and for the document `brochure` it returns 422
-- [ ] After reading wording section 3, manual section 10, then wording section 3 again, `get_claim` lists `sections_read` as wording 3 then manual 10, each once
-- [ ] Each section's text in the database matches the text under its heading in `data/`, checked by a pytest test
-- [ ] The OpenAPI test passes, and `grep -rn evals backend agent dashboard/src` finds nothing
-- [ ] `npm run check` passes
+- [x] `uv run -m backend.seed` prints `Seeded 25 claims, 50 policies, 49 customers, 3 handlers and 26 sections into undercover.db`
+- [x] `curl -s localhost:8000/api/sections` returns 26 sections, 12 of `policy_wording` and 14 of `claims_manual`. Wording section 10 is "How we work out your payment" and manual section 9 is "Repeat claims"
+- [x] `curl -s "localhost:8000/api/sections/search?query=giraffe"` returns manual section 7, "Interpretation notes", with the paragraph on wild animals. A word that appears nowhere returns an empty list
+- [x] `read_section` for wording section 3 on `CLM-1001` after `start_claim` returns "Trip Delay" and its full text. On a waiting claim it returns 409, for section 99 it returns 404, and for the document `brochure` it returns 422
+- [x] After reading wording section 3, manual section 10, then wording section 3 again, `get_claim` lists `sections_read` as wording 3 then manual 10, each once
+- [x] Each section's text in the database matches the text under its heading in `data/`, checked by a pytest test
+- [x] The OpenAPI test passes, and `grep -rn evals backend agent dashboard/src` finds nothing
+- [x] `npm run check` passes
 
 ## Phase 3: The claim agent
 

@@ -10,6 +10,7 @@ Status = Literal[
 DecisionKind = Literal["approve", "decline", "refer"]
 StepKind = Literal["tool_call", "tool_result", "message", "error"]
 TodoStatus = Literal["todo", "in_progress", "done", "left_for_handler"]
+DocumentName = Literal["policy_wording", "claims_manual"]
 
 
 class Item(BaseModel):
@@ -36,6 +37,20 @@ class Payment(BaseModel):
     amount: float
     paid_at: str
     signed_off_by: str | None
+
+
+class SectionRef(BaseModel):
+    document: DocumentName
+    section: int
+    title: str
+
+
+class Section(SectionRef):
+    text: str
+
+
+class SearchResult(SectionRef):
+    matches: list[str]
 
 
 class ClaimSummary(BaseModel):
@@ -69,6 +84,7 @@ class Claim(BaseModel):
     attempts: int
     decision: Decision | None
     payment: Payment | None
+    sections_read: list[SectionRef]
 
 
 class Trip(BaseModel):
@@ -148,7 +164,8 @@ class DecisionRequest(BaseModel):
         ge=0, description="In US dollars, 0 for a decline or referral"
     )
     section: str = Field(
-        min_length=1, description="The section of the policy wording relied on"
+        min_length=1,
+        description="The section of the policy wording or the claims manual relied on",
     )
     reason: str = Field(
         min_length=1, description="Two or three sentences explaining the decision"
@@ -186,3 +203,8 @@ class TodosRequest(BaseModel):
 
 class FinishRequest(BaseModel):
     summary: str = Field(min_length=1, description="A short summary for the handlers")
+
+
+class ReadRequest(BaseModel):
+    document: DocumentName
+    section: int = Field(description="The section's number")
