@@ -2,13 +2,19 @@ import pytest
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from agent import __main__ as cli
-from agent import main
+from agent import api, harness
 from agent.tests.stub import StubModel, call, decide, provider_down
 from agent.tools import CLAIM_TOOLS
 
 
 def steps_of(client, claim_id):
     return client.get(f"/api/claims/{claim_id}/steps").json()
+
+
+def test_a_refusal_carries_the_status_and_the_reason():
+    refusal = api.Refused(403, "Needs a handler's sign-off")
+    assert (refusal.status, refusal.detail) == (403, "Needs a handler's sign-off")
+    assert str(refusal) == "Refused with status 403: Needs a handler's sign-off"
 
 
 def test_claim_tools_are_named_after_backend_operations(client):
@@ -42,7 +48,7 @@ def test_claim_instructions(client):
 
 def test_the_claim_agent_uses_the_instructions_from_the_backend(client):
     stub = StubModel(replies=decide("CLM-1003", "refer", 0))
-    main.work_claim("CLM-1003", stub)
+    harness.work_claim("CLM-1003", stub)
     system = stub.prompts[0][0]
     assert isinstance(system, SystemMessage)
     assert system.content == client.get("/api/instructions/claim").json()["text"]
@@ -80,7 +86,7 @@ def test_the_claim_agent_looks_things_up_decides_and_pays(client):
             AIMessage(content="Approved and paid $420.00."),
         ]
     )
-    assert main.work_claim("CLM-1001", stub) == "CLM-1001  approve  $420.00  paid"
+    assert harness.work_claim("CLM-1001", stub) == "CLM-1001  approve  $420.00  paid"
 
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "decided"
@@ -118,7 +124,7 @@ def test_payment_over_the_limit_is_refused(client):
             call("pay_claim", claim_id="CLM-1002", amount=1350.0),
         )
     )
-    line = main.work_claim("CLM-1002", stub)
+    line = harness.work_claim("CLM-1002", stub)
     assert line == "CLM-1002  approve  $1,350.00  waiting for sign-off"
 
     refusal = stub.prompts[-1][-1]
@@ -131,7 +137,7 @@ def test_payment_over_the_limit_is_refused(client):
 @pytest.mark.parametrize("decision", ["decline", "refer"])
 def test_declines_and_referrals(client, decision):
     stub = StubModel(replies=decide("CLM-1003", decision, 0))
-    assert main.work_claim("CLM-1003", stub) == f"CLM-1003  {decision}  $0.00"
+    assert harness.work_claim("CLM-1003", stub) == f"CLM-1003  {decision}  $0.00"
     claim = client.get("/api/claims/CLM-1003").json()
     assert claim["status"] == "decided"
     assert claim["payment"] is None
@@ -139,20 +145,22 @@ def test_declines_and_referrals(client, decision):
 
 def test_an_approval_that_wasnt_paid(client):
     stub = StubModel(replies=decide("CLM-1001", "approve", 420.0))
-    assert main.work_claim("CLM-1001", stub) == "CLM-1001  approve  $420.00  not paid"
+    assert (
+        harness.work_claim("CLM-1001", stub) == "CLM-1001  approve  $420.00  not paid"
+    )
 
 
 def test_a_provider_error_is_retried(client):
     replies = decide("CLM-1003", "refer", 0)
     stub = StubModel(replies=[RuntimeError("502 Bad Gateway"), *replies])
-    assert main.work_claim("CLM-1003", stub) == "CLM-1003  refer  $0.00"
+    assert harness.work_claim("CLM-1003", stub) == "CLM-1003  refer  $0.00"
     assert len(stub.prompts) == len(replies) + 1
     assert [s["kind"] for s in steps_of(client, "CLM-1003")].count("error") == 0
 
 
 def test_a_failed_claim_goes_back_in_the_queue(client):
     stub = StubModel(replies=provider_down())
-    assert main.work_claim("CLM-1001", stub) == (
+    assert harness.work_claim("CLM-1001", stub) == (
         "CLM-1001  failed: RuntimeError: The model provider is down."
         " Back in the queue for another try"
     )
@@ -167,8 +175,8 @@ def test_a_failed_claim_goes_back_in_the_queue(client):
 
 
 def test_a_claim_that_fails_twice_is_left_for_a_handler(client):
-    main.work_claim("CLM-1001", StubModel(replies=provider_down()))
-    line = main.work_claim("CLM-1001", StubModel(replies=provider_down()))
+    harness.work_claim("CLM-1001", StubModel(replies=provider_down()))
+    line = harness.work_claim("CLM-1001", StubModel(replies=provider_down()))
     assert line == (
         "CLM-1001  failed: RuntimeError: The model provider is down. Left for a handler"
     )
@@ -182,7 +190,7 @@ def test_a_claim_that_fails_twice_is_left_for_a_handler(client):
 
 def test_finishing_without_a_decision_is_a_failure(client):
     stub = StubModel(replies=[AIMessage(content="I am not sure what to do.")])
-    assert main.work_claim("CLM-1001", stub) == (
+    assert harness.work_claim("CLM-1001", stub) == (
         "CLM-1001  failed: The agent finished without recording a decision."
         " Back in the queue for another try"
     )
@@ -192,7 +200,7 @@ def test_finishing_without_a_decision_is_a_failure(client):
 def test_a_failure_after_the_decision_keeps_the_decision(client):
     replies = decide("CLM-1003", "refer", 0)[:2]
     stub = StubModel(replies=[*replies, *provider_down()])
-    assert main.work_claim("CLM-1003", stub) == "CLM-1003  refer  $0.00"
+    assert harness.work_claim("CLM-1003", stub) == "CLM-1003  refer  $0.00"
     claim = client.get("/api/claims/CLM-1003").json()
     assert claim["status"] == "decided"
     assert claim["attempts"] == 1
@@ -203,25 +211,23 @@ def test_a_claim_agent_that_loops_is_stopped(client):
     stub = StubModel(
         replies=[call("get_claim", claim_id="CLM-1001") for _ in range(40)]
     )
-    line = main.work_claim("CLM-1001", stub)
+    line = harness.work_claim("CLM-1001", stub)
     assert line.startswith("CLM-1001  failed: ModelCallLimitExceededError")
     assert line.endswith("Back in the queue for another try")
-    assert len(stub.prompts) == main.MAX_MODEL_CALLS
+    assert len(stub.prompts) == harness.MAX_MODEL_CALLS
 
 
 def test_a_claim_that_isnt_waiting_isnt_worked(client):
-    main.work_claim("CLM-1003", StubModel(replies=decide("CLM-1003", "refer", 0)))
+    harness.work_claim("CLM-1003", StubModel(replies=decide("CLM-1003", "refer", 0)))
     before = steps_of(client, "CLM-1003")
     stub = StubModel(replies=[])
-    assert main.work_claim("CLM-1003", stub) == (
-        "CLM-1003  not worked: Claim CLM-1003 is not waiting"
-    )
+    with pytest.raises(api.Refused, match="409: Claim CLM-1003 is not waiting"):
+        harness.work_claim("CLM-1003", stub)
     assert stub.prompts == []
     assert steps_of(client, "CLM-1003") == before
     assert client.get("/api/claims/CLM-1003").json()["attempts"] == 1
-    assert main.work_claim("CLM-9999", stub) == (
-        "CLM-9999  not worked: Claim CLM-9999 not found"
-    )
+    with pytest.raises(api.Refused, match="404: Claim CLM-9999 not found"):
+        harness.work_claim("CLM-9999", stub)
 
 
 def test_command_line_works_one_claim(monkeypatch, capsys):
@@ -230,14 +236,21 @@ def test_command_line_works_one_claim(monkeypatch, capsys):
     assert capsys.readouterr().out == "CLM-1001  refer  $0.00\n"
 
 
+def test_command_line_says_why_a_claim_wasnt_worked(client):
+    client.post("/api/claims/CLM-1001/start", json={"thread_id": "another-run"})
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["CLM-1001"])
+    assert stopped.value.code == "Claim CLM-1001 is not waiting"
+
+
 def test_model(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("MODEL_NAME", raising=False)
-    default = main.model()
+    default = harness.chat_model()
     assert default.model_name == "deepseek/deepseek-v4.1-flash"
     assert default.reasoning_effort == "low"
     assert default.request_timeout == 120
     assert default.max_retries == 0
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
-    assert main.model().model_name == "openrouter/free"
-    assert main.model().reasoning_effort is None
+    assert harness.chat_model().model_name == "openrouter/free"
+    assert harness.chat_model().reasoning_effort is None

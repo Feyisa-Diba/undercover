@@ -3,8 +3,8 @@
 import argparse
 import sys
 
-from agent.main import work_claim
-from agent.queue_agent import work_queue
+from agent import api
+from agent.harness import work_claim, work_queue
 
 
 def main(args: list[str]) -> None:
@@ -15,10 +15,13 @@ def main(args: list[str]) -> None:
     parser.add_argument("claim_id", nargs="?", help="work this one claim")
     parser.add_argument("--cap", type=int, help="the most claims the run may work")
     options = parser.parse_args(args)
-    if options.claim_id:
-        print(work_claim(options.claim_id))
-    else:
+    if not options.claim_id:
         work_queue(options.cap)
+        return
+    try:
+        print(work_claim(options.claim_id))
+    except api.Refused as refusal:
+        sys.exit(refusal.detail)
 
 
 if __name__ == "__main__":

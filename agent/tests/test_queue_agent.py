@@ -3,10 +3,12 @@ from contextlib import closing
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.utils.function_calling import convert_to_openai_tool
 
 from agent import __main__ as cli
-from agent import queue_agent
+from agent import harness
 from agent.tests.stub import StubModel, call, decide, provider_down
+from agent.tools import QUEUE_TOOLS
 
 CLAIMS = ["CLM-1001", "CLM-1002", "CLM-1003"]
 
@@ -54,9 +56,10 @@ def reminders(stub):
 
 
 def test_queue_tools(client):
-    run = queue_agent.QueueRun(1, 5, None)
-    names = [t.name for t in run.tools()]
+    names = [t.name for t in QUEUE_TOOLS]
     assert names == ["list_claims", "write_todos", "work_claim"]
+    shown = convert_to_openai_tool(QUEUE_TOOLS[2])["function"]["parameters"]
+    assert list(shown["properties"]) == ["claim_id"]
     operations = {
         operation["operationId"]
         for path in client.get("/openapi.json").json()["paths"].values()
@@ -94,7 +97,7 @@ def test_the_run_keeps_its_to_do_list(client, capsys, three_waiting):
         + decide("CLM-1002", "approve", 1350.0)
         + decide("CLM-1003", "refer", 0)
     )
-    queue_agent.work_queue(None, queue, claim)
+    harness.work_queue(None, queue, claim)
 
     assert capsys.readouterr().out.splitlines() == [
         "Working up to 3 claims with stub-model",
@@ -128,7 +131,7 @@ def test_a_bad_to_do_list_is_refused_and_the_run_goes_on(client, three_waiting):
             summary(),
         ]
     )
-    queue_agent.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
+    harness.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
     refusal = queue.prompts[1][-1]
     assert isinstance(refusal, ToolMessage)
     assert refusal.text.startswith("Refused with status 422")
@@ -148,7 +151,7 @@ def test_the_cap(client, capsys, three_waiting):
     claim = StubModel(
         replies=decide("CLM-1001", "refer", 0) + decide("CLM-1002", "refer", 0)
     )
-    queue_agent.work_queue(2, queue, claim)
+    harness.work_queue(2, queue, claim)
 
     lines = capsys.readouterr().out.splitlines()
     assert lines[3] == "CLM-1003  not worked: this run's cap of 2 claims is reached"
@@ -157,6 +160,27 @@ def test_the_cap(client, capsys, three_waiting):
     assert left["status"] == "waiting"
     assert client.get("/api/claims/CLM-1003").json()["attempts"] == 0
     assert reminders(queue) == []
+
+
+def test_a_claim_that_isnt_waiting_doesnt_count_toward_the_cap(
+    client, capsys, three_waiting
+):
+    queue = StubModel(
+        replies=[
+            call("work_claim", claim_id="CLM-1004"),
+            call("work_claim", claim_id="CLM-9999"),
+            call("work_claim", claim_id="CLM-1001"),
+            summary(),
+        ]
+    )
+    harness.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
+
+    assert capsys.readouterr().out.splitlines()[1:4] == [
+        "CLM-1004  not worked: Claim CLM-1004 is not waiting",
+        "CLM-9999  not worked: Claim CLM-9999 not found",
+        "CLM-1001  refer  $0.00",
+    ]
+    assert claims(client)["CLM-1001"]["status"] == "decided"
 
 
 def test_a_failed_claim_is_tried_again_later(client, three_waiting):
@@ -175,7 +199,7 @@ def test_a_failed_claim_is_tried_again_later(client, three_waiting):
         + decide("CLM-1003", "decline", 0)
         + decide("CLM-1001", "refer", 0)
     )
-    queue_agent.work_queue(None, queue, claim)
+    harness.work_queue(None, queue, claim)
 
     assert {c: claims(client)[c]["status"] for c in CLAIMS} == dict.fromkeys(
         CLAIMS, "decided"
@@ -205,7 +229,7 @@ def test_a_claim_that_fails_twice_is_left_and_the_run_goes_on(
         + decide("CLM-1002", "refer", 0)
         + decide("CLM-1003", "refer", 0)
     )
-    queue_agent.work_queue(None, queue, claim)
+    harness.work_queue(None, queue, claim)
 
     lines = capsys.readouterr().out.splitlines()
     assert lines[2].endswith("Left for a handler")
@@ -233,7 +257,7 @@ def test_the_check_for_missed_claims(client, three_waiting):
         + decide("CLM-1002", "refer", 0)
         + decide("CLM-1003", "refer", 0)
     )
-    queue_agent.work_queue(None, queue, claim)
+    harness.work_queue(None, queue, claim)
 
     assert reminders(queue) == [
         "Before you finish: these claims are still waiting, and this run can"
@@ -253,7 +277,7 @@ def test_a_claim_back_in_the_queue_counts_as_missed(client, three_waiting):
         ]
     )
     claim = StubModel(replies=provider_down() + decide("CLM-1001", "refer", 0))
-    queue_agent.work_queue(1, queue, claim)
+    harness.work_queue(1, queue, claim)
 
     assert reminders(queue) == [
         "Before you finish: these claims are still waiting, and this run can"
@@ -264,15 +288,15 @@ def test_a_claim_back_in_the_queue_counts_as_missed(client, three_waiting):
 
 def test_no_reminder_once_the_cap_is_reached(client, three_waiting):
     queue = StubModel(replies=[call("work_claim", claim_id="CLM-1001"), summary()])
-    queue_agent.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
+    harness.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
     assert reminders(queue) == []
     assert claims(client)["CLM-1002"]["status"] == "waiting"
 
 
 def test_reminders_stop_after_three(client, three_waiting):
     queue = StubModel(replies=[summary() for _ in range(4)])
-    queue_agent.work_queue(None, queue, StubModel(replies=[]))
-    assert len(reminders(queue)) == queue_agent.MAX_REMINDERS
+    harness.work_queue(None, queue, StubModel(replies=[]))
+    assert len(reminders(queue)) == harness.MAX_REMINDERS
     assert len(queue.prompts) == 4
     assert client.get("/api/runs").json()[0]["finished_at"]
     assert all(claims(client)[c]["status"] == "waiting" for c in CLAIMS)
@@ -281,7 +305,7 @@ def test_reminders_stop_after_three(client, three_waiting):
 def test_a_claim_left_in_progress_is_released_and_worked(client, three_waiting):
     client.post("/api/claims/CLM-1001/start", json={"thread_id": "stopped-run"})
     queue = StubModel(replies=[call("work_claim", claim_id="CLM-1001"), summary()])
-    queue_agent.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
+    harness.work_queue(1, queue, StubModel(replies=decide("CLM-1001", "refer", 0)))
 
     worked = client.get("/api/claims/CLM-1001").json()
     assert worked["status"] == "decided"
@@ -289,7 +313,7 @@ def test_a_claim_left_in_progress_is_released_and_worked(client, three_waiting):
     first = client.get("/api/claims/CLM-1001/steps").json()[0]
     assert (first["kind"], first["content"], first["thread_id"]) == (
         "error",
-        queue_agent.STOPPED,
+        harness.STOPPED,
         "stopped-run",
     )
 
@@ -300,7 +324,7 @@ def test_a_queue_agent_that_fails_finishes_the_run(client, three_waiting):
     )
     claim = StubModel(replies=decide("CLM-1001", "refer", 0))
     with pytest.raises(RuntimeError, match="The model provider is down"):
-        queue_agent.work_queue(None, queue, claim)
+        harness.work_queue(None, queue, claim)
 
     run = client.get("/api/runs").json()[0]
     assert run["summary"] == (
@@ -313,7 +337,7 @@ def test_a_queue_agent_that_fails_finishes_the_run(client, three_waiting):
 def test_nothing_waiting(client, capsys, database):
     with closing(sqlite3.connect(database)) as db, db:
         db.execute("UPDATE claims SET status = 'decided'")
-    queue_agent.work_queue(None, StubModel(replies=[]), StubModel(replies=[]))
+    harness.work_queue(None, StubModel(replies=[]), StubModel(replies=[]))
     assert capsys.readouterr().out == "No claims are waiting\n"
     assert client.get("/api/runs").json() == []
 
