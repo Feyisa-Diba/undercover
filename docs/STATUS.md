@@ -2,7 +2,7 @@
 
 The claims pilot in `docs/PLAN.md` is built: all six phases are done.
 
-The agent's harness in `docs/PLAN_HARNESS.md` is in progress: phases 1 to 4 of 6 are done, apart from the live checks of phases 3 and 4, which wait for a backend on port 8000 running the new code.
+The agent's harness in `docs/PLAN_HARNESS.md` is in progress: phases 1 to 5 of 6 are done, apart from the live checks of phases 3 and 4, which wait for a backend on port 8000 running the new code.
 
 ## Running it
 
@@ -25,8 +25,8 @@ The agent's harness in `docs/PLAN_HARNESS.md` is in progress: phases 1 to 4 of 6
 - `agent/`: two agents built with `create_agent`.
   - The queue agent (`agent/queue_agent.py`): `work_queue(cap)` releases any claim left in progress by a run that stopped, starts a run, and gives the queue agent three tools: `list_claims`, `write_todos` (for its run's to-do list) and `work_claim`, which hands a claim to a claim agent and refuses a new claim once the cap is reached. A completion check, an `after_model` hook, sends the agent back to work when it tries to finish with claims it could still work, at most 3 times. Its final reply is recorded as the run's summary. If it fails, the run is finished with "The run stopped early".
   - The claim agent (`agent/main.py`): `work_claim(claim_id)` starts the claim, runs a fresh claim agent with a new thread, and reports back in one line built from the claim's record. A claim still in progress after a failure, or after finishing with no decision, is released with the reason. The claim agent has eight tools named after backend operations: `get_claim`, `get_policy`, `get_claim_history`, `list_sections`, `search_sections`, `read_section`, `record_decision` and `pay_claim`. It records every tool call, tool result and message as a step. Middleware retries a failed model call 3 times with backoff, and stops a claim agent after 30 model calls. The model has a 120 second timeout.
-- `dashboard/`: the queue (`/`), with counts by state and a line per claim. A claim in full (`/claims/:claimId`), with its policy, earlier claims, the decision and payment, the agent's steps as it works, and a sign-off form for a held payout. The agent's instructions (`/instructions`) for running the queue and for working a claim, read only. The queue and a claim page refresh every two seconds. Styled to `BRAND.md` in light and dark mode.
-- `e2e/`: tests of the three pages, the agent's steps appearing on a claim page, and a handler signing off a held payout. Playwright runs its own backend on port 8001 with `e2e/undercover.db`, and its own dashboard on port 5174, so it can run next to `npm run dev`.
+- `dashboard/`: the queue (`/`), with counts for the five states, the agent's to-do list for the newest run (each item To do, In progress, Done or Left for a handler, then the run's summary when it finishes), and a line per claim. A claim in full (`/claims/:claimId`), with its policy, earlier claims, the decision and payment, the sections of the wording and the manual the agent read, the agent's steps as it works (failures shown as Failed), and a sign-off form for a held payout. The agent's instructions (`/instructions`) for running the queue and for working a claim, read only. The queue and a claim page refresh every two seconds. Styled to `BRAND.md` in light and dark mode.
+- `e2e/`: tests of the three pages, the agent's steps appearing on a claim page, a handler signing off a held payout, the to-do list filling in and being ticked off, a claim left for a handler, and the sections read. Playwright runs its own backend on port 8001 with `e2e/undercover.db`, and its own dashboard on port 5174, so it can run next to `npm run dev`.
 
 ## Last live run
 

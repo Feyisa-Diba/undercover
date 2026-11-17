@@ -210,14 +210,14 @@ Add the queue agent with `list_claims`, `write_todos` and `work_claim`, the cap,
 
 Add the to-do list panel and the fifth state tile to the queue page, the "Sections read" panel and failed steps to the claim page, and the message for a claim left for a handler.
 
-- [ ] vitest covers the to-do list in each status, a finished run with its summary, "No runs yet", the five state tiles, the sections read panel (empty and with sections), a failed step, and a claim left for a handler, against a stubbed `fetch`
-- [ ] e2e, to-do list: the test starts a run and writes a to-do list through the API. Without a reload, the queue page shows the items. After the test marks one done and finishes the run, the page shows it ticked off and the summary
-- [ ] e2e, left for a handler: the test starts and releases `CLM-1012` twice. The claim page shows "Left for a handler" and two "Failed" steps with their reasons
-- [ ] e2e, sections read: the test starts `CLM-1014` and reads two sections. The claim page lists them under "Sections read" without a reload
-- [ ] Browser, with `browser_evaluate`: To do, In progress, Done and Left for a handler have the background colors from the design, as does the Left for a handler state chip
-- [ ] Browser: screenshots of the queue page with a to-do list, and a claim page with sections read, in light and dark mode, show rounded panels with no outlines, no one-edge borders and no gradients
-- [ ] Browser: `browser_console_messages` shows no errors on any page
-- [ ] `npm run check` passes
+- [x] vitest covers the to-do list in each status, a finished run with its summary, "No runs yet", the five state tiles, the sections read panel (empty and with sections), a failed step, and a claim left for a handler, against a stubbed `fetch`
+- [x] e2e, to-do list: the test starts a run and writes a to-do list through the API. Without a reload, the queue page shows the items. After the test marks one done and finishes the run, the page shows it ticked off and the summary
+- [x] e2e, left for a handler: the test starts and releases `CLM-1012` twice. The claim page shows "Left for a handler" and two "Failed" steps with their reasons
+- [x] e2e, sections read: the test starts `CLM-1014` and reads two sections. The claim page lists them under "Sections read" without a reload
+- [x] Browser, with `browser_evaluate`: To do, In progress, Done and Left for a handler have the background colors from the design, as does the Left for a handler state chip
+- [x] Browser: screenshots of the queue page with a to-do list, and a claim page with sections read, in light and dark mode, show rounded panels with no outlines, no one-edge borders and no gradients
+- [x] Browser: `browser_console_messages` shows no errors on any page
+- [x] `npm run check` passes
 
 ## Phase 6: A live trial, and the documents
 

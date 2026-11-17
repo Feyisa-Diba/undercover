@@ -1,8 +1,14 @@
 export type Status =
-  "waiting" | "in_progress" | "waiting_for_sign_off" | "decided";
+  | "waiting"
+  | "in_progress"
+  | "waiting_for_sign_off"
+  | "decided"
+  | "left_for_handler";
 export type DecisionKind = "approve" | "decline" | "refer";
-export type StepKind = "tool_call" | "tool_result" | "message";
+export type StepKind = "tool_call" | "tool_result" | "message" | "error";
 export type AgentName = "queue" | "claim";
+export type DocumentName = "policy_wording" | "claims_manual";
+export type TodoStatus = "todo" | "in_progress" | "done" | "left_for_handler";
 
 export interface ClaimSummary {
   claim_id: string;
@@ -42,6 +48,12 @@ export interface Payment {
   signed_off_by: string | null;
 }
 
+export interface SectionRef {
+  document: DocumentName;
+  section: number;
+  title: string;
+}
+
 export interface Claim {
   claim_id: string;
   policy_id: string;
@@ -58,8 +70,10 @@ export interface Claim {
   documents: ClaimDocument[];
   status: Status;
   thread_id: string | null;
+  attempts: number;
   decision: Decision | null;
   payment: Payment | null;
+  sections_read: SectionRef[];
 }
 
 export interface Policy {
@@ -102,6 +116,20 @@ export interface Step {
   kind: StepKind;
   content: string;
   created_at: string;
+}
+
+export interface Todo {
+  content: string;
+  status: TodoStatus;
+}
+
+export interface Run {
+  run_id: number;
+  cap: number;
+  started_at: string;
+  finished_at: string | null;
+  summary: string | null;
+  todos: Todo[];
 }
 
 export class ApiError extends Error {
@@ -149,6 +177,7 @@ export const api = {
   getInstructions: (agent: AgentName) =>
     request<{ text: string }>(`/api/instructions/${agent}`),
   listHandlers: () => request<Handler[]>("/api/handlers"),
+  listRuns: () => request<Run[]>("/api/runs"),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),
 };

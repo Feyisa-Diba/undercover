@@ -60,7 +60,10 @@ function StepBody({ step }: Readonly<{ step: Step }>) {
   }
   return (
     <p>
-      <span className="step-label">Agent</span> {step.content}
+      <span className="step-label">
+        {step.kind === "error" ? "Failed" : "Agent"}
+      </span>{" "}
+      {step.content}
     </p>
   );
 }

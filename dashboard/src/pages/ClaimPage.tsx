@@ -5,6 +5,7 @@ import { StatusChip } from "../components/Chips";
 import { DecisionPanel } from "../components/DecisionPanel";
 import { Message } from "../components/Message";
 import { HistoryPanel, PolicyPanel } from "../components/PolicyPanels";
+import { SectionsRead } from "../components/SectionsRead";
 import { StepList } from "../components/StepList";
 import { date, label, money } from "../format";
 import { REFRESH_MS, useLoad } from "../useLoad";
@@ -35,6 +36,7 @@ export function ClaimPage() {
         </div>
         <div className="column">
           <DecisionPanel claim={claim} onSignedOff={reload} />
+          <SectionsRead sections={claim.sections_read} />
           <StepList claimId={claim.claim_id} />
           <PolicyPanel policyId={claim.policy_id} />
           <HistoryPanel customerId={claim.customer_id} />
