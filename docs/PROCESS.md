@@ -14,6 +14,7 @@ The pre-commit hook runs the format, lint, type and unit test checks on every co
 
 When asked to plan, as in "Please plan the pilot", write the plan to `docs/PLAN.md` and write no code.
 
+- Start with the design: the modules the work adds or changes, what each one owns, and how they depend on each other, checked against `docs/CODE_STANDARDS.md`. Where the work outgrows code from an earlier build, plan the restructure as its own phase, first. The student reviews the design with the plan.
 - Split the work into phases, usually 5 or 6, each building on the last.
 - Give each phase detailed success criteria that you can verify yourself: tests that pass, commands and their output, API calls and their responses, and pages you check in the browser with the Playwright MCP server. Write each one as a checkbox.
 - Then stop and wait until you are asked to implement the plan.
@@ -24,14 +25,16 @@ When asked to implement the plan, as in "Please implement the plan for the pilot
 
 1. Build it, with tests.
 2. Check every success criterion and fix whatever fails.
-3. Tick off its criteria in `docs/PLAN.md` and update `docs/STATUS.md`.
-4. Commit. The pre-commit hook runs the checks; if it fails, fix the problem and commit again.
+3. Review the phase's diff as a pull request reviewer would, against `docs/CODE_STANDARDS.md` and the design in the plan, and fix what you find. Search the diff for URL strings and API paths outside the API modules, imports between modules that shouldn't depend on each other, helpers that do the same job, and instructions written as numbered steps.
+4. Tick off its criteria in `docs/PLAN.md` and update `docs/STATUS.md`.
+5. Commit. The pre-commit hook runs the checks; if it fails, fix the problem and commit again.
 
-When the last phase is done, run `npm run check` and report the results.
+When the last phase is done, review the whole build's diff the same way, run `npm run check` and report the results, including what the review found.
 
 ## Rules
 
 - Add tests with each change. Tests never call a model; use a stub model.
+- Green checks are not a review. Never commit code you wouldn't approve in someone else's pull request.
 - Outside a plan, commit each change once you have checked it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.
