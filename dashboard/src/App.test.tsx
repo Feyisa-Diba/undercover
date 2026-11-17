@@ -106,9 +106,16 @@ it("shows other errors loading a claim", async () => {
 });
 
 it("shows the agent's instructions read only", async () => {
-  stubApi({ "GET /api/instructions/claim": { text: "# Working a claim" } });
+  stubApi({
+    "GET /api/instructions/queue": { text: "# Running the queue" },
+    "GET /api/instructions/claim": { text: "# Working a claim" },
+  });
   renderAt("/instructions");
+  expect(await screen.findByText("# Running the queue")).toBeDefined();
   expect(await screen.findByText("# Working a claim")).toBeDefined();
+  expect(
+    screen.getByRole("heading", { name: "Running the queue" }),
+  ).toBeDefined();
   expect(
     screen.getByRole("heading", { name: "Working a claim" }),
   ).toBeDefined();

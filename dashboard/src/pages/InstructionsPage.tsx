@@ -11,6 +11,7 @@ export function InstructionsPage() {
         What the agent reads before it starts. It looks up the policy wording
         and the claims manual as it needs them. This page is read only.
       </p>
+      <InstructionsPanel agent="queue" title="Running the queue" />
       <InstructionsPanel agent="claim" title="Working a claim" />
     </>
   );

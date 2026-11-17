@@ -191,20 +191,20 @@ Give the claim agent the section tools, write its instructions from the wording 
 
 Add the queue agent with `list_claims`, `write_todos` and `work_claim`, the cap, the completion check, the release of claims left in progress, `finish_run`, its instructions at `/api/instructions/queue`, and the `--cap` option. The instructions page shows both sets of instructions.
 
-- [ ] A pytest test checks that the queue agent's tools are exactly `list_claims`, `write_todos` and `work_claim`, and that the first two are named after backend operations
-- [ ] Stub model test, the to-do list stored: with three claims waiting, the queue stub writes a to-do list, works each claim and ticks it off, then replies with a summary. `list_runs` shows the run with three items `done`, the summary and a finish time
-- [ ] Stub model test, the cap: with three claims waiting and a cap of 2, the stub tries all three. The third gets the cap line and stays `waiting` with `attempts` 0
-- [ ] Stub model test, a failed claim doesn't stop the run: the claim agent fails on `CLM-1001` every time, and `CLM-1002` and `CLM-1003` are still decided
-- [ ] Stub model test, a failed claim is tried again: `CLM-1001` fails once and is worked again later in the run. It ends decided with `attempts` 2, one `error` step and steps from two thread ids
-- [ ] Stub model test, a claim that fails twice: `CLM-1001` ends `left_for_handler`, the line says so, and the run goes on to the other claims
-- [ ] Stub model test, the check for missed claims: the stub tries to finish after one of three claims. The queue agent is sent back with a message naming the other two, works them, and finishes. With the cap reached, the same stub finishes without a reminder. A stub that never works the missed claims is reminded 3 times, then the run finishes
-- [ ] Stub model test: a claim left in progress before the run starts is released at the start and then worked in the run
-- [ ] Stub model test: a queue agent that fails after its retries leaves the run finished with "The run stopped early" and no claim in progress
-- [ ] A test of the command line: `--cap 5` starts a run with cap 5, no arguments starts one with the number of waiting claims, and a claim id works that claim alone
-- [ ] `curl -s localhost:8000/api/instructions/queue` returns the queue agent's instructions, and the instructions page shows "Running the queue" and "Working a claim"
+- [x] A pytest test checks that the queue agent's tools are exactly `list_claims`, `write_todos` and `work_claim`, and that the first two are named after backend operations
+- [x] Stub model test, the to-do list stored: with three claims waiting, the queue stub writes a to-do list, works each claim and ticks it off, then replies with a summary. `list_runs` shows the run with three items `done`, the summary and a finish time
+- [x] Stub model test, the cap: with three claims waiting and a cap of 2, the stub tries all three. The third gets the cap line and stays `waiting` with `attempts` 0
+- [x] Stub model test, a failed claim doesn't stop the run: the claim agent fails on `CLM-1001` every time, and `CLM-1002` and `CLM-1003` are still decided
+- [x] Stub model test, a failed claim is tried again: `CLM-1001` fails once and is worked again later in the run. It ends decided with `attempts` 2, one `error` step and steps from two thread ids
+- [x] Stub model test, a claim that fails twice: `CLM-1001` ends `left_for_handler`, the line says so, and the run goes on to the other claims
+- [x] Stub model test, the check for missed claims: the stub tries to finish after one of three claims. The queue agent is sent back with a message naming the other two, works them, and finishes. With the cap reached, the same stub finishes without a reminder. A stub that never works the missed claims is reminded 3 times, then the run finishes
+- [x] Stub model test: a claim left in progress before the run starts is released at the start and then worked in the run
+- [x] Stub model test: a queue agent that fails after its retries leaves the run finished with "The run stopped early" and no claim in progress
+- [x] A test of the command line: `--cap 5` starts a run with cap 5, no arguments starts one with the number of waiting claims, and a claim id works that claim alone
+- [x] `curl -s localhost:8000/api/instructions/queue` returns the queue agent's instructions, and the instructions page shows "Running the queue" and "Working a claim"
 - [ ] Live: on a fresh database with `npm run dev` running, `uv run -m agent --cap 5` prints the header, five lines and a summary
 - [ ] Live: afterwards, `curl -s localhost:8000/api/claims` shows 20 claims `waiting` and none `in_progress`, and `curl -s localhost:8000/api/runs` shows the run finished, with every to-do item `done` or `left_for_handler`
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 5: Dashboard: the to-do list, sections read, and claims left for a handler
 

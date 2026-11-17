@@ -222,7 +222,7 @@ def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
 
 
 @app.get("/api/instructions/{agent}", operation_id="get_instructions")
-def get_instructions(agent: Literal["claim"]) -> Instructions:
+def get_instructions(agent: Literal["queue", "claim"]) -> Instructions:
     """Get the instructions for one of the agents."""
     return Instructions(text=(INSTRUCTIONS / f"{agent}.md").read_text(encoding="utf-8"))
 

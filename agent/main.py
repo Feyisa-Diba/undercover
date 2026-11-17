@@ -28,6 +28,7 @@ MODEL_TIMEOUT = 120
 MODEL_RETRIES = 3
 RETRY_DELAY = 2.0
 MAX_MODEL_CALLS = 30
+NOT_WORKED = "not worked"
 
 
 def model_name() -> str:
@@ -117,7 +118,7 @@ def work_claim(claim_id: str, llm: BaseChatModel | None = None) -> str:
     thread_id = str(uuid.uuid4())
     started = request("POST", f"/api/claims/{claim_id}/start", {"thread_id": thread_id})
     if started.is_error:
-        return f"{claim_id}  not worked: {started.json()['detail']}"
+        return f"{claim_id}  {NOT_WORKED}: {started.json()['detail']}"
     try:
         run(claim_id, thread_id, llm)
     except Exception as error:  # one failed claim must never stop the run
@@ -152,10 +153,3 @@ def outcome(claim: dict[str, Any]) -> str:
     if decision["decision"] == "approve":
         return f"{line}  not paid"
     return line
-
-
-def work_queue() -> None:
-    """Work every waiting claim in queue order, printing a line for each."""
-    for claim in call_backend("GET", "/api/claims"):
-        if claim["status"] == "waiting":
-            print(work_claim(claim["claim_id"]), flush=True)
