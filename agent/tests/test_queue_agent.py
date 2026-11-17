@@ -122,6 +122,51 @@ def test_the_run_keeps_its_to_do_list(client, capsys, three_waiting):
     )
 
 
+def test_work_claim_keeps_the_to_do_list_in_step(client, monkeypatch, three_waiting):
+    def statuses():
+        return [todo["status"] for todo in client.get("/api/runs").json()[0]["todos"]]
+
+    seen = []
+    original = harness.work_claim
+
+    def work_claim(claim_id, model=None):
+        seen.append(statuses())
+        return original(claim_id, model)
+
+    monkeypatch.setattr(harness, "work_claim", work_claim)
+    plan = [
+        *todos("todo", "todo", "todo"),
+        {"content": "CLM-1004 A claim", "status": "todo"},
+    ]
+    queue = StubModel(
+        replies=[
+            call("write_todos", todos=plan),
+            call("work_claim", claim_id="CLM-1001"),
+            call("work_claim", claim_id="CLM-1002"),
+            call("work_claim", claim_id="CLM-1001"),
+            call("work_claim", claim_id="CLM-1003"),
+            call("work_claim", claim_id="CLM-1004"),
+            summary(),
+        ]
+    )
+    claim = StubModel(
+        replies=provider_down()
+        + decide("CLM-1002", "approve", 1350.0)
+        + provider_down()
+        + decide("CLM-1003", "refer", 0)
+    )
+    harness.work_queue(4, queue, claim)
+
+    assert seen == [
+        ["in_progress", "todo", "todo", "todo"],
+        ["todo", "in_progress", "todo", "todo"],
+        ["in_progress", "done", "todo", "todo"],
+        ["left_for_handler", "done", "in_progress", "todo"],
+        ["left_for_handler", "done", "done", "in_progress"],
+    ]
+    assert statuses() == ["left_for_handler", "done", "done", "todo"]
+
+
 def test_a_bad_to_do_list_is_refused_and_the_run_goes_on(client, three_waiting):
     bad = [{"content": "", "status": "todo"}]
     queue = StubModel(

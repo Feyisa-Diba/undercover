@@ -2,7 +2,8 @@
 
 The claim agent's tools are named after the backend operations they call. The
 queue agent's tools reach their run through its context: `write_todos` keeps the
-run's to-do list and `work_claim` hands a claim to a claim agent within the cap.
+run's to-do list and `work_claim` hands a claim to a claim agent within the cap,
+keeping the claim's item on the list in step with the claim.
 """
 
 import json
@@ -17,6 +18,22 @@ from agent import api
 
 ONE_CLAIM_AT_A_TIME = threading.Lock()
 
+TodoStatus = Literal["todo", "in_progress", "done", "left_for_handler"]
+
+# A claim's status, as its item on the to-do list shows it
+TODO_STATUS: dict[str, TodoStatus] = {
+    "waiting": "todo",
+    "in_progress": "in_progress",
+    "waiting_for_sign_off": "done",
+    "decided": "done",
+    "left_for_handler": "left_for_handler",
+}
+
+
+class Todo(TypedDict):
+    content: str
+    status: TodoStatus
+
 
 @dataclass
 class RunContext:
@@ -25,13 +42,9 @@ class RunContext:
     run_id: int
     cap: int
     work_claim: Callable[[str], str]
+    todos: list[Todo] = field(default_factory=list)
     started: set[str] = field(default_factory=set)
     reminders: int = 0
-
-
-class Todo(TypedDict):
-    content: str
-    status: Literal["todo", "in_progress", "done", "left_for_handler"]
 
 
 def answer[**P](call: Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> str:
@@ -113,24 +126,38 @@ def write_todos(todos: list[Todo], runtime: ToolRuntime[RunContext]) -> str:
         api.write_todos(runtime.context.run_id, todos)
     except api.Refused as refusal:
         return str(refusal)
+    runtime.context.todos = [todo.copy() for todo in todos]
     return "Saved the to-do list"
+
+
+def keep_in_step(run: RunContext, claim_id: str, status: TodoStatus) -> None:
+    """Show a claim's status on the run's to-do list, if the claim is on it."""
+    items = [todo for todo in run.todos if todo["content"].startswith(claim_id)]
+    for todo in items:
+        todo["status"] = status
+    if items:
+        api.write_todos(run.run_id, run.todos)
 
 
 @tool
 def work_claim(claim_id: str, runtime: ToolRuntime[RunContext]) -> str:
     """Hand a waiting claim to a claim agent, and get back one line: the
-    decision and payout, or what went wrong."""
+    decision and payout, or what went wrong. The claim's item on the to-do
+    list shows it in progress, then where it stands when it comes back."""
     run = runtime.context
     with ONE_CLAIM_AT_A_TIME:  # so the cap holds when calls come in parallel
         if claim_id not in run.started and len(run.started) >= run.cap:
             return (
                 f"{claim_id}  not worked: this run's cap of {run.cap} claims is reached"
             )
+        keep_in_step(run, claim_id, "in_progress")
         try:
             line = run.work_claim(claim_id)
         except api.Refused as refusal:
+            keep_in_step(run, claim_id, "todo")
             return f"{claim_id}  not worked: {refusal.detail}"
         run.started.add(claim_id)
+        keep_in_step(run, claim_id, TODO_STATUS[api.get_claim(claim_id)["status"]])
         return line
 
 

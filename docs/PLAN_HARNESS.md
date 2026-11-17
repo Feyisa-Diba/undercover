@@ -183,8 +183,8 @@ Give the claim agent the section tools, write its instructions from the wording 
 - [x] `main.model()` is `deepseek/deepseek-v4.1-flash` with low reasoning effort and a 120 second timeout, and `openrouter/free` when `MODEL_NAME` says so
 - [x] Browser, `/instructions`: the claim agent's instructions, with no text box, input or edit button. The e2e test of the instructions page checks for them
 - [x] `grep -rn evals backend agent dashboard/src` finds nothing, and `grep -rn "data/" agent` finds nothing
-- [ ] Live: on a fresh database with `npm run dev` running, `uv run -m agent CLM-1005` prints one line with a decision and payout
-- [ ] Live: `curl -s localhost:8000/api/claims/CLM-1005` then shows a decision with a section and a reason, and `sections_read` includes at least one section of the claims manual
+- [x] Live: on a fresh database with `npm run dev` running, `uv run -m agent CLM-1005` prints one line with a decision and payout
+- [x] Live: `curl -s localhost:8000/api/claims/CLM-1005` then shows a decision with a section and a reason, and `sections_read` includes at least one section of the claims manual
 - [x] `npm run check` passes
 
 ## Phase 4: The queue agent
@@ -202,8 +202,8 @@ Add the queue agent with `list_claims`, `write_todos` and `work_claim`, the cap,
 - [x] Stub model test: a queue agent that fails after its retries leaves the run finished with "The run stopped early" and no claim in progress
 - [x] A test of the command line: `--cap 5` starts a run with cap 5, no arguments starts one with the number of waiting claims, and a claim id works that claim alone
 - [x] `curl -s localhost:8000/api/instructions/queue` returns the queue agent's instructions, and the instructions page shows "Running the queue" and "Working a claim"
-- [ ] Live: on a fresh database with `npm run dev` running, `uv run -m agent --cap 5` prints the header, five lines and a summary
-- [ ] Live: afterwards, `curl -s localhost:8000/api/claims` shows 20 claims `waiting` and none `in_progress`, and `curl -s localhost:8000/api/runs` shows the run finished, with every to-do item `done` or `left_for_handler`
+- [x] Live: on a fresh database with `npm run dev` running, `uv run -m agent --cap 5` prints the header, five lines and a summary
+- [x] Live: afterwards, `curl -s localhost:8000/api/claims` shows 20 claims `waiting` and none `in_progress`, and `curl -s localhost:8000/api/runs` shows the run finished, with every to-do item `done` or `left_for_handler`
 - [x] `npm run check` passes
 
 ## Phase 5: Dashboard: the to-do list, sections read, and claims left for a handler
@@ -227,8 +227,8 @@ Run the trial the brief describes, watch it in the browser, and bring the docume
 - [ ] Live: the run ends with five claims worked and 20 still `waiting`. The queue page shows the finished run and its summary
 - [ ] Live, in the browser: each worked claim's page shows its steps, including the `read_section` calls, and its "Sections read". At least one claim lists a section of the claims manual
 - [ ] Live: every decision has a section and a reason of two or three sentences. Every approval over $1,000 is `waiting_for_sign_off` with no payment, and every other approval is paid exactly its payout
-- [ ] `docs/SPEC.md`: decisions follow the policy wording and the claims manual. The manual is out of "Not for now", and "What the team needs to see" includes the run's to-do list, the sections the agent read, and claims left for a handler
-- [ ] `docs/TECH_STACK.md` describes the two agents, the middleware, the default model and the entry points
+- [x] `docs/SPEC.md`: decisions follow the policy wording and the claims manual. The manual is out of "Not for now", and "What the team needs to see" includes the run's to-do list, the sections the agent read, and claims left for a handler
+- [x] `docs/TECH_STACK.md` describes the two agents, the middleware, the default model and the entry points
 - [ ] `docs/STATUS.md` describes what's built, how to run a capped run, a full run and a single claim, and the results of the live trial
 - [ ] `npm run check` passes
 
