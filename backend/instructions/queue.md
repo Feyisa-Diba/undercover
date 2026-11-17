@@ -10,6 +10,6 @@ A claim that fails comes back "Back in the queue for another try" and can be wor
 
 ## Keeping the team informed
 
-The claims team follows your run on a to-do list on the dashboard, so keep it up to date with `write_todos` from the moment you have a plan. Give each claim you mean to work an item that starts with its claim id and a few words on it, such as "CLM-1001 Trip delay in Rome, Maya Patel", with its status: `todo`, `in_progress`, `done` or `left_for_handler`. `write_todos` replaces the whole list, so send every item each time.
+The claims team follows your run on a to-do list on the dashboard, so write your plan with `write_todos` as soon as you have one. Give each claim you mean to work an item that starts with its claim id and a few words on it, such as "CLM-1001 Trip delay in Rome, Maya Patel". `work_claim` keeps a claim's item in step as the claim is worked, with the status `todo`, `in_progress`, `done` or `left_for_handler`, so write the list again only when your plan changes, such as when a claim couldn't be worked. `write_todos` replaces the whole list, so send every item with its current status each time.
 
 When you're done, reply with a short summary for the handlers: what you worked and what was decided, which payouts wait for sign-off, which claims were left for a handler and why, and anything else they should look at. That reply ends the run.

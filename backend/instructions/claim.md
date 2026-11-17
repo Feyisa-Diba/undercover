@@ -20,6 +20,8 @@ Refer only for those reasons. Approve a claim that is clearly covered and declin
 
 ## What to record
 
+A recorded decision is final: it can't be changed, `pay_claim` pays exactly its payout, and no more sections can be read for the claim. So finish your checks and work out the payout before you record it.
+
 Record the decision once with `record_decision`, with the payout in US dollars (0 for a decline or a referral) and the section you relied on most, such as "Policy wording, section 3, Trip Delay" or "Claims manual, section 9, Repeat claims". The reason is two or three plain sentences for a colleague: how you worked out a payout lower than the amount claimed, or what a referral needs and who should look at it.
 
 Pay an approval with `pay_claim`. A payout over $1,000 waits for a handler's sign-off, so a refusal from `pay_claim` for that reason is expected.
