@@ -2,6 +2,7 @@ export type Status =
   "waiting" | "in_progress" | "waiting_for_sign_off" | "decided";
 export type DecisionKind = "approve" | "decline" | "refer";
 export type StepKind = "tool_call" | "tool_result" | "message";
+export type AgentName = "queue" | "claim";
 
 export interface ClaimSummary {
   claim_id: string;
@@ -145,7 +146,8 @@ export const api = {
     request<PreviousClaim[]>(
       `/api/customers/${encodeURIComponent(customerId)}/claims`,
     ),
-  getInstructions: () => request<{ text: string }>("/api/instructions"),
+  getInstructions: (agent: AgentName) =>
+    request<{ text: string }>(`/api/instructions/${agent}`),
   listHandlers: () => request<Handler[]>("/api/handlers"),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),

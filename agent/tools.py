@@ -7,6 +7,8 @@ from langchain_core.tools import tool
 
 BACKEND_URL = "http://localhost:8000"
 
+Document = Literal["policy_wording", "claims_manual"]
+
 
 def backend() -> httpx.Client:
     """Return a client for the UnderCover backend."""
@@ -47,6 +49,26 @@ def get_claim_history(customer_id: str) -> str:
 
 
 @tool
+def list_sections() -> str:
+    """List the sections of the policy wording and the claims manual."""
+    return reply(request("GET", "/api/sections"))
+
+
+@tool
+def search_sections(query: str) -> str:
+    """Find the sections of the wording and the manual that use the query's words."""
+    params = httpx.QueryParams(query=query)
+    return reply(request("GET", f"/api/sections/search?{params}"))
+
+
+@tool
+def read_section(claim_id: str, document: Document, section: int) -> str:
+    """Read one section of the policy wording or the claims manual in full."""
+    body = {"document": document, "section": section}
+    return reply(request("POST", f"/api/claims/{claim_id}/reads", body))
+
+
+@tool
 def record_decision(
     claim_id: str,
     decision: Literal["approve", "decline", "refer"],
@@ -70,4 +92,13 @@ def pay_claim(claim_id: str, amount: float) -> str:
     return reply(request("POST", f"/api/claims/{claim_id}/payment", {"amount": amount}))
 
 
-TOOLS = [get_claim, get_policy, get_claim_history, record_decision, pay_claim]
+CLAIM_TOOLS = [
+    get_claim,
+    get_policy,
+    get_claim_history,
+    list_sections,
+    search_sections,
+    read_section,
+    record_decision,
+    pay_claim,
+]

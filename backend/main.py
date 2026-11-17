@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException
 
@@ -39,7 +39,7 @@ from backend.models import (
     TodosRequest,
 )
 
-INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+INSTRUCTIONS = Path(__file__).parent / "instructions"
 MAX_ATTEMPTS = 2
 SEARCH_RESULTS = 5
 SHORTEST_WORD = 3
@@ -221,11 +221,10 @@ def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
     ]
 
 
-@app.get("/api/instructions", operation_id="get_instructions")
-def get_instructions(db: Database) -> Instructions:
-    """Get the agent's instructions, followed by the policy wording."""
-    wording = db.execute("SELECT policy_wording FROM settings").fetchone()[0]
-    return Instructions(text=f"{INSTRUCTIONS.read_text(encoding='utf-8')}\n{wording}")
+@app.get("/api/instructions/{agent}", operation_id="get_instructions")
+def get_instructions(agent: Literal["claim"]) -> Instructions:
+    """Get the instructions for one of the agents."""
+    return Instructions(text=(INSTRUCTIONS / f"{agent}.md").read_text(encoding="utf-8"))
 
 
 @app.get("/api/sections", operation_id="list_sections")

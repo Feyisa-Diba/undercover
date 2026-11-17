@@ -15,8 +15,7 @@ HEADING = re.compile(r"^## (\d+)\. (.+)$", re.MULTILINE)
 
 SCHEMA = """
 CREATE TABLE settings (
-    payout_approval_limit REAL NOT NULL,
-    policy_wording TEXT NOT NULL
+    payout_approval_limit REAL NOT NULL
 );
 CREATE TABLE handlers (
     handler_id TEXT PRIMARY KEY,
@@ -135,7 +134,6 @@ def seed(path: Path) -> dict[str, int]:
     customers = load("customers.json")
     policies = load("policies.json")
     claims = load("claims.json")
-    wording = (DATA / "policy_wording.md").read_text(encoding="utf-8")
     sections = [
         (document, *section)
         for document, name in DOCUMENTS.items()
@@ -145,8 +143,7 @@ def seed(path: Path) -> dict[str, int]:
     with closing(sqlite3.connect(path)) as connection, connection:
         connection.executescript(SCHEMA)
         connection.execute(
-            "INSERT INTO settings VALUES (?, ?)",
-            (company["payout_approval_limit"], wording),
+            "INSERT INTO settings VALUES (?)", (company["payout_approval_limit"],)
         )
         connection.executemany(
             "INSERT INTO handlers VALUES (?, ?, ?, ?)",

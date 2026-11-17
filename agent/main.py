@@ -1,35 +1,56 @@
-"""The UnderCover Agent."""
+"""The UnderCover Agent's claim agent, which works one claim from a clean start."""
 
 import json
 import os
 import uuid
-from collections import Counter
 from typing import Any
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
+from langchain.agents.middleware import (
+    AgentMiddleware,
+    ModelCallLimitMiddleware,
+    ModelRetryMiddleware,
+)
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import SecretStr
 
-from agent.tools import TOOLS, request
+from agent.tools import CLAIM_TOOLS, request
 
 load_dotenv(override=True)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "openai/gpt-6-luna"
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
+MODEL_TIMEOUT = 120
+MODEL_RETRIES = 3
+RETRY_DELAY = 2.0
+MAX_MODEL_CALLS = 30
+
+
+def model_name() -> str:
+    """Return the model in MODEL_NAME, or DeepSeek V4.1 Flash by default."""
+    return os.getenv("MODEL_NAME") or DEFAULT_MODEL
 
 
 def model() -> ChatOpenAI:
-    """Return the model named in MODEL_NAME, or GPT-6 Luna by default."""
-    name = os.getenv("MODEL_NAME")
+    """Return the model on OpenRouter, with low reasoning effort for the default."""
     return ChatOpenAI(
-        model=name or DEFAULT_MODEL,
+        model=model_name(),
         base_url=OPENROUTER_BASE_URL,
         api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]),
-        reasoning_effort=None if name else "low",
+        reasoning_effort=None if os.getenv("MODEL_NAME") else "low",
+        timeout=MODEL_TIMEOUT,
+        max_retries=0,
+    )
+
+
+def retries() -> ModelRetryMiddleware:
+    """Retry a failed model call, waiting longer each time, then raise."""
+    return ModelRetryMiddleware(
+        max_retries=MODEL_RETRIES, initial_delay=RETRY_DELAY, on_failure="error"
     )
 
 
@@ -60,13 +81,17 @@ def steps(message: AnyMessage) -> list[tuple[str, str]]:
 
 
 def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
-    """Work one claim, recording each step with the backend, and return the reply."""
-    call_backend("POST", f"/api/claims/{claim_id}/start", {"thread_id": thread_id})
-    instructions = call_backend("GET", "/api/instructions")["text"]
+    """Work a started claim with a fresh claim agent, recording each step."""
+    instructions = call_backend("GET", "/api/instructions/claim")["text"]
+    middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        retries(),
+        ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS, exit_behavior="error"),
+    ]
     agent = create_agent(
         llm or model(),
-        tools=TOOLS,
+        tools=CLAIM_TOOLS,
         system_prompt=instructions,
+        middleware=middleware,
         checkpointer=InMemorySaver(),
     )
     states = agent.stream(
@@ -87,26 +112,50 @@ def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
     return messages[-1].text
 
 
+def work_claim(claim_id: str, llm: BaseChatModel | None = None) -> str:
+    """Work one claim from a clean start and report back in one line."""
+    thread_id = str(uuid.uuid4())
+    started = request("POST", f"/api/claims/{claim_id}/start", {"thread_id": thread_id})
+    if started.is_error:
+        return f"{claim_id}  not worked: {started.json()['detail']}"
+    try:
+        run(claim_id, thread_id, llm)
+    except Exception as error:  # one failed claim must never stop the run
+        return settle(
+            claim_id, f"{type(error).__name__}: {' '.join(str(error).split())}"
+        )
+    return settle(claim_id, "The agent finished without recording a decision")
+
+
+def settle(claim_id: str, failure: str) -> str:
+    """Report how a claim ended, releasing it if it's still in progress."""
+    claim = call_backend("GET", f"/api/claims/{claim_id}")
+    if claim["status"] == "in_progress":
+        reason = failure.rstrip(". ")
+        claim = call_backend(
+            "POST", f"/api/claims/{claim_id}/release", {"reason": reason}
+        )
+        if claim["status"] == "waiting":
+            return f"{claim_id}  failed: {reason}. Back in the queue for another try"
+        return f"{claim_id}  failed: {reason}. Left for a handler"
+    return outcome(claim)
+
+
+def outcome(claim: dict[str, Any]) -> str:
+    """Describe a decided claim in one line: the decision, payout and payment."""
+    decision = claim["decision"]
+    line = f"{claim['claim_id']}  {decision['decision']}  ${decision['payout']:,.2f}"
+    if claim["payment"]:
+        return f"{line}  paid"
+    if claim["status"] == "waiting_for_sign_off":
+        return f"{line}  waiting for sign-off"
+    if decision["decision"] == "approve":
+        return f"{line}  not paid"
+    return line
+
+
 def work_queue() -> None:
-    """Work every waiting claim in queue order, printing each decision and a count."""
-    outcomes: Counter[str] = Counter()
+    """Work every waiting claim in queue order, printing a line for each."""
     for claim in call_backend("GET", "/api/claims"):
-        if claim["status"] != "waiting":
-            continue
-        claim_id = claim["claim_id"]
-        try:
-            run(claim_id, str(uuid.uuid4()))
-        except Exception as error:  # one failed claim shouldn't stop the queue
-            print(f"{claim_id}  failed: {error}", flush=True)
-            outcomes["failed"] += 1
-            continue
-        decision = call_backend("GET", f"/api/claims/{claim_id}")["decision"]
-        if decision is None:
-            print(f"{claim_id}  undecided", flush=True)
-            outcomes["undecided"] += 1
-        else:
-            outcome = decision["decision"]
-            print(f"{claim_id}  {outcome}  ${decision['payout']:,.2f}", flush=True)
-            outcomes[outcome] += 1
-    counts = ", ".join(f"{outcomes[name]} {name}" for name in sorted(outcomes))
-    print(f"Worked {outcomes.total()} claims: {counts or 'none waiting'}")
+        if claim["status"] == "waiting":
+            print(work_claim(claim["claim_id"]), flush=True)

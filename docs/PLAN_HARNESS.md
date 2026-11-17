@@ -173,19 +173,19 @@ Backend only. Seed the `sections` table, add `list_sections`, `search_sections` 
 
 Give the claim agent the section tools, write its instructions from the wording and the manual, serve them from `get_instructions` at `/api/instructions/claim`, and add the default model, the middleware and `work_claim`. The command line works one named claim. The instructions page shows the claim agent's instructions.
 
-- [ ] A pytest test checks that the claim agent's tools are exactly `get_claim`, `get_policy`, `get_claim_history`, `list_sections`, `search_sections`, `read_section`, `record_decision` and `pay_claim`, each named after a backend operation
-- [ ] `curl -s localhost:8000/api/instructions/claim` returns the claim agent's instructions, which name the tools for looking things up and don't contain the wording itself: no `## 10. How we work out your payment`
-- [ ] A stub model test checks that the system prompt the claim agent receives is the text from `/api/instructions/claim`
-- [ ] Stub model test: the claim agent searches, reads wording section 3 and manual section 10, approves and pays. The claim is decided and paid, `sections_read` lists both sections, and the steps include the `read_section` calls in order
-- [ ] Stub model test: a provider error on the first model call is retried, and the claim is decided
-- [ ] Stub model test: a stub that never stops calling `get_claim` is stopped at 30 model calls, and `work_claim` reports the failure
-- [ ] Stub model tests for `work_claim`, one for each kind of line: paid, waiting for sign-off, refer, failed and back in the queue (status `waiting`, `attempts` 1, an `error` step), failed a second time and left for a handler, finished without a decision (released), failed after its decision (not released, still decided, the line gives the decision), and not waiting (nothing recorded)
-- [ ] `main.model()` is `deepseek/deepseek-v4.1-flash` with low reasoning effort and a 120 second timeout, and `openrouter/free` when `MODEL_NAME` says so
-- [ ] Browser, `/instructions`: the claim agent's instructions, with no text box, input or edit button. The e2e test of the instructions page checks for them
-- [ ] `grep -rn evals backend agent dashboard/src` finds nothing, and `grep -rn "data/" agent` finds nothing
+- [x] A pytest test checks that the claim agent's tools are exactly `get_claim`, `get_policy`, `get_claim_history`, `list_sections`, `search_sections`, `read_section`, `record_decision` and `pay_claim`, each named after a backend operation
+- [x] `curl -s localhost:8000/api/instructions/claim` returns the claim agent's instructions, which name the tools for looking things up and don't contain the wording itself: no `## 10. How we work out your payment`
+- [x] A stub model test checks that the system prompt the claim agent receives is the text from `/api/instructions/claim`
+- [x] Stub model test: the claim agent searches, reads wording section 3 and manual section 10, approves and pays. The claim is decided and paid, `sections_read` lists both sections, and the steps include the `read_section` calls in order
+- [x] Stub model test: a provider error on the first model call is retried, and the claim is decided
+- [x] Stub model test: a stub that never stops calling `get_claim` is stopped at 30 model calls, and `work_claim` reports the failure
+- [x] Stub model tests for `work_claim`, one for each kind of line: paid, waiting for sign-off, refer, failed and back in the queue (status `waiting`, `attempts` 1, an `error` step), failed a second time and left for a handler, finished without a decision (released), failed after its decision (not released, still decided, the line gives the decision), and not waiting (nothing recorded)
+- [x] `main.model()` is `deepseek/deepseek-v4.1-flash` with low reasoning effort and a 120 second timeout, and `openrouter/free` when `MODEL_NAME` says so
+- [x] Browser, `/instructions`: the claim agent's instructions, with no text box, input or edit button. The e2e test of the instructions page checks for them
+- [x] `grep -rn evals backend agent dashboard/src` finds nothing, and `grep -rn "data/" agent` finds nothing
 - [ ] Live: on a fresh database with `npm run dev` running, `uv run -m agent CLM-1005` prints one line with a decision and payout
 - [ ] Live: `curl -s localhost:8000/api/claims/CLM-1005` then shows a decision with a section and a reason, and `sections_read` includes at least one section of the claims manual
-- [ ] `npm run check` passes
+- [x] `npm run check` passes
 
 ## Phase 4: The queue agent
 
