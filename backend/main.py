@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 
 from backend.database import connect, database_path, seed
 from backend.models import (
@@ -33,6 +33,7 @@ from backend.models import (
     SectionRef,
     SignOffRequest,
     StartRequest,
+    Status,
     Step,
     StepKind,
     StepRequest,
@@ -44,6 +45,13 @@ MAX_ATTEMPTS = 2
 SEARCH_RESULTS = 5
 SHORTEST_WORD = 3
 COMMON_WORDS = {"the", "and", "for", "with", "was", "are", "not", "you", "your", "our"}
+STATUS_NAMES: dict[Status, str] = {
+    "waiting": "waiting",
+    "in_progress": "in progress",
+    "waiting_for_sign_off": "waiting for sign-off",
+    "decided": "decided",
+    "left_for_handler": "left for a handler",
+}
 
 
 @asynccontextmanager
@@ -55,6 +63,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="UnderCover", lifespan=lifespan)
+router = APIRouter(prefix="/api")
 
 
 def database() -> Iterator[sqlite3.Connection]:
@@ -88,6 +97,14 @@ def find_claim(db: sqlite3.Connection, claim_id: str) -> sqlite3.Row:
     ).fetchone()
     if row is None:
         raise HTTPException(404, f"Claim {claim_id} not found")
+    return row
+
+
+def find_claim_in(db: sqlite3.Connection, claim_id: str, status: Status) -> sqlite3.Row:
+    """Return one claim's row if it has the status, or raise a 404 or a 409."""
+    row = find_claim(db, claim_id)
+    if row["status"] != status:
+        raise HTTPException(409, f"Claim {claim_id} is not {STATUS_NAMES[status]}")
     return row
 
 
@@ -178,26 +195,26 @@ def to_run(row: sqlite3.Row) -> Run:
     return Run(**dict(row) | {"todos": json.loads(row["todos"])})
 
 
-@app.get("/api/health", operation_id="health")
+@router.get("/health", operation_id="health")
 def health() -> dict[str, str]:
     """Check that the backend is running."""
     return {"status": "ok"}
 
 
-@app.get("/api/claims", operation_id="list_claims")
+@router.get("/claims", operation_id="list_claims")
 def list_claims(db: Database) -> list[ClaimSummary]:
     """List every claim in the queue, in id order."""
     rows = db.execute("SELECT * FROM claim_view ORDER BY claim_id").fetchall()
     return [to_summary(row) for row in rows]
 
 
-@app.get("/api/claims/{claim_id}", operation_id="get_claim")
+@router.get("/claims/{claim_id}", operation_id="get_claim")
 def get_claim(claim_id: str, db: Database) -> Claim:
     """Get one claim in full: the story, the items claimed and the documents."""
     return load_claim(db, claim_id)
 
 
-@app.get("/api/policies/{policy_id}", operation_id="get_policy")
+@router.get("/policies/{policy_id}", operation_id="get_policy")
 def get_policy(policy_id: str, db: Database) -> Policy:
     """Get a policy: the plan, add-ons, purchase date, trip and travelers."""
     row = db.execute(
@@ -208,7 +225,7 @@ def get_policy(policy_id: str, db: Database) -> Policy:
     return Policy(**json.loads(row["record"]))
 
 
-@app.get("/api/customers/{customer_id}/claims", operation_id="get_claim_history")
+@router.get("/customers/{customer_id}/claims", operation_id="get_claim_history")
 def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
     """Get a customer's earlier claims, with the outcome and the amount paid."""
     row = db.execute(
@@ -221,20 +238,20 @@ def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
     ]
 
 
-@app.get("/api/instructions/{agent}", operation_id="get_instructions")
+@router.get("/instructions/{agent}", operation_id="get_instructions")
 def get_instructions(agent: Literal["queue", "claim"]) -> Instructions:
     """Get the instructions for one of the agents."""
     return Instructions(text=(INSTRUCTIONS / f"{agent}.md").read_text(encoding="utf-8"))
 
 
-@app.get("/api/sections", operation_id="list_sections")
+@router.get("/sections", operation_id="list_sections")
 def list_sections(db: Database) -> list[SectionRef]:
     """List the sections of the policy wording and the claims manual."""
     rows = db.execute("SELECT document, section, title FROM sections ORDER BY rowid")
     return [SectionRef(**dict(row)) for row in rows]
 
 
-@app.get("/api/sections/search", operation_id="search_sections")
+@router.get("/sections/search", operation_id="search_sections")
 def search_sections(query: str, db: Database) -> list[SearchResult]:
     """Find the sections of the wording and the manual that use a query's words."""
     words = {
@@ -258,12 +275,10 @@ def search_sections(query: str, db: Database) -> list[SearchResult]:
     return [result for _, result in found[:SEARCH_RESULTS]]
 
 
-@app.post("/api/claims/{claim_id}/reads", operation_id="read_section")
+@router.post("/claims/{claim_id}/reads", operation_id="read_section")
 def read_section(claim_id: str, request: ReadRequest, db: Database) -> Section:
     """Read a section of the wording or the manual, and note it on the claim."""
-    claim = find_claim(db, claim_id)
-    if claim["status"] != "in_progress":
-        raise HTTPException(409, f"Claim {claim_id} is not in progress")
+    claim = find_claim_in(db, claim_id, "in_progress")
     row = db.execute(
         "SELECT * FROM sections WHERE document = ? AND section = ?",
         (request.document, request.section),
@@ -279,18 +294,17 @@ def read_section(claim_id: str, request: ReadRequest, db: Database) -> Section:
     return Section(**dict(row))
 
 
-@app.get("/api/handlers", operation_id="list_handlers")
+@router.get("/handlers", operation_id="list_handlers")
 def list_handlers(db: Database) -> list[Handler]:
     """List the claims handlers."""
     rows = db.execute("SELECT * FROM handlers ORDER BY handler_id").fetchall()
     return [Handler(**dict(row)) for row in rows]
 
 
-@app.post("/api/claims/{claim_id}/start", operation_id="start_claim")
+@router.post("/claims/{claim_id}/start", operation_id="start_claim")
 def start_claim(claim_id: str, request: StartRequest, db: Database) -> Claim:
     """Start work on a waiting claim, which moves it to in progress."""
-    if find_claim(db, claim_id)["status"] != "waiting":
-        raise HTTPException(409, f"Claim {claim_id} is not waiting")
+    find_claim_in(db, claim_id, "waiting")
     db.execute(
         "UPDATE claims SET status = 'in_progress', thread_id = ?,"
         " attempts = attempts + 1 WHERE claim_id = ?",
@@ -299,19 +313,17 @@ def start_claim(claim_id: str, request: StartRequest, db: Database) -> Claim:
     return load_claim(db, claim_id)
 
 
-@app.post("/api/claims/{claim_id}/release", operation_id="release_claim")
+@router.post("/claims/{claim_id}/release", operation_id="release_claim")
 def release_claim(claim_id: str, request: ReleaseRequest, db: Database) -> Claim:
     """Put a failed claim back in the queue, or for a handler after two tries."""
-    claim = find_claim(db, claim_id)
-    if claim["status"] != "in_progress":
-        raise HTTPException(409, f"Claim {claim_id} is not in progress")
+    claim = find_claim_in(db, claim_id, "in_progress")
     add_step(db, claim_id, claim["thread_id"], "error", request.reason)
     status = "waiting" if claim["attempts"] < MAX_ATTEMPTS else "left_for_handler"
     db.execute("UPDATE claims SET status = ? WHERE claim_id = ?", (status, claim_id))
     return load_claim(db, claim_id)
 
 
-@app.post("/api/claims/{claim_id}/steps", operation_id="record_step")
+@router.post("/claims/{claim_id}/steps", operation_id="record_step")
 def record_step(claim_id: str, request: StepRequest, db: Database) -> Step:
     """Record one step of the agent's work on a claim."""
     thread_id = find_claim(db, claim_id)["thread_id"]
@@ -320,7 +332,7 @@ def record_step(claim_id: str, request: StepRequest, db: Database) -> Step:
     return add_step(db, claim_id, thread_id, request.kind, request.content)
 
 
-@app.get("/api/claims/{claim_id}/steps", operation_id="list_steps")
+@router.get("/claims/{claim_id}/steps", operation_id="list_steps")
 def list_steps(claim_id: str, db: Database) -> list[Step]:
     """List the steps of the agent's work on a claim, in order."""
     find_claim(db, claim_id)
@@ -330,11 +342,10 @@ def list_steps(claim_id: str, db: Database) -> list[Step]:
     return [Step(**dict(row)) for row in rows]
 
 
-@app.post("/api/claims/{claim_id}/decision", operation_id="record_decision")
+@router.post("/claims/{claim_id}/decision", operation_id="record_decision")
 def record_decision(claim_id: str, request: DecisionRequest, db: Database) -> Claim:
     """Record the decision on a claim; an approval over the limit waits for sign-off."""
-    if find_claim(db, claim_id)["status"] != "in_progress":
-        raise HTTPException(409, f"Claim {claim_id} is not in progress")
+    find_claim_in(db, claim_id, "in_progress")
     payout = round(request.payout, 2)
     held = request.decision == "approve" and payout > approval_limit(db)
     db.execute(
@@ -348,7 +359,7 @@ def record_decision(claim_id: str, request: DecisionRequest, db: Database) -> Cl
     return load_claim(db, claim_id)
 
 
-@app.post("/api/claims/{claim_id}/payment", operation_id="pay_claim")
+@router.post("/claims/{claim_id}/payment", operation_id="pay_claim")
 def pay_claim(claim_id: str, request: PaymentRequest, db: Database) -> Payment:
     """Pay an approved claim its payout, unless it needs a handler's sign-off."""
     claim = find_claim(db, claim_id)
@@ -368,12 +379,10 @@ def pay_claim(claim_id: str, request: PaymentRequest, db: Database) -> Payment:
     return pay(db, claim_id, claim["payout"], None)
 
 
-@app.post("/api/claims/{claim_id}/sign-off", operation_id="sign_off_claim")
+@router.post("/claims/{claim_id}/sign-off", operation_id="sign_off_claim")
 def sign_off_claim(claim_id: str, request: SignOffRequest, db: Database) -> Claim:
     """Sign off a held payout as a handler, which pays it and decides the claim."""
-    claim = find_claim(db, claim_id)
-    if claim["status"] != "waiting_for_sign_off":
-        raise HTTPException(409, f"Claim {claim_id} is not waiting for sign-off")
+    claim = find_claim_in(db, claim_id, "waiting_for_sign_off")
     row = db.execute(
         "SELECT * FROM handlers WHERE handler_id = ?", (request.handler_id,)
     ).fetchone()
@@ -390,7 +399,7 @@ def sign_off_claim(claim_id: str, request: SignOffRequest, db: Database) -> Clai
     return load_claim(db, claim_id)
 
 
-@app.post("/api/runs", operation_id="start_run")
+@router.post("/runs", operation_id="start_run")
 def start_run(request: RunRequest, db: Database) -> Run:
     """Start a run of the agent on the queue, with an empty to-do list."""
     row = db.execute(
@@ -400,14 +409,14 @@ def start_run(request: RunRequest, db: Database) -> Run:
     return to_run(row)
 
 
-@app.get("/api/runs", operation_id="list_runs")
+@router.get("/runs", operation_id="list_runs")
 def list_runs(db: Database) -> list[Run]:
     """List the agent's runs with their to-do lists, newest first."""
     rows = db.execute("SELECT * FROM runs ORDER BY run_id DESC").fetchall()
     return [to_run(row) for row in rows]
 
 
-@app.put("/api/runs/{run_id}/todos", operation_id="write_todos")
+@router.put("/runs/{run_id}/todos", operation_id="write_todos")
 def write_todos(run_id: int, request: TodosRequest, db: Database) -> Run:
     """Replace the to-do list of a run that hasn't finished."""
     find_open_run(db, run_id)
@@ -416,7 +425,7 @@ def write_todos(run_id: int, request: TodosRequest, db: Database) -> Run:
     return to_run(find_run(db, run_id))
 
 
-@app.post("/api/runs/{run_id}/finish", operation_id="finish_run")
+@router.post("/runs/{run_id}/finish", operation_id="finish_run")
 def finish_run(run_id: int, request: FinishRequest, db: Database) -> Run:
     """Finish a run with a short summary for the handlers."""
     find_open_run(db, run_id)
@@ -425,3 +434,6 @@ def finish_run(run_id: int, request: FinishRequest, db: Database) -> Run:
         (now(), request.summary, run_id),
     )
     return to_run(find_run(db, run_id))
+
+
+app.include_router(router)

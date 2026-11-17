@@ -141,8 +141,10 @@ export class ApiError extends Error {
   }
 }
 
+const BASE_URL = "/api";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const response = await fetch(`${BASE_URL}${path}`, init);
   if (!response.ok) {
     const body = (await response.json()) as { detail?: unknown };
     const detail =
@@ -160,24 +162,23 @@ function post<T>(path: string, body: object): Promise<T> {
   });
 }
 
-const claimPath = (claimId: string) =>
-  `/api/claims/${encodeURIComponent(claimId)}`;
+const claimPath = (claimId: string) => `/claims/${encodeURIComponent(claimId)}`;
 
 export const api = {
-  listClaims: () => request<ClaimSummary[]>("/api/claims"),
+  listClaims: () => request<ClaimSummary[]>("/claims"),
   getClaim: (claimId: string) => request<Claim>(claimPath(claimId)),
   listSteps: (claimId: string) =>
     request<Step[]>(`${claimPath(claimId)}/steps`),
   getPolicy: (policyId: string) =>
-    request<Policy>(`/api/policies/${encodeURIComponent(policyId)}`),
+    request<Policy>(`/policies/${encodeURIComponent(policyId)}`),
   getClaimHistory: (customerId: string) =>
     request<PreviousClaim[]>(
-      `/api/customers/${encodeURIComponent(customerId)}/claims`,
+      `/customers/${encodeURIComponent(customerId)}/claims`,
     ),
   getInstructions: (agent: AgentName) =>
-    request<{ text: string }>(`/api/instructions/${agent}`),
-  listHandlers: () => request<Handler[]>("/api/handlers"),
-  listRuns: () => request<Run[]>("/api/runs"),
+    request<{ text: string }>(`/instructions/${agent}`),
+  listHandlers: () => request<Handler[]>("/handlers"),
+  listRuns: () => request<Run[]>("/runs"),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),
 };
