@@ -2,7 +2,7 @@
 
 The claims pilot in `docs/PLAN.md` is built: all six phases are done.
 
-The agent's harness in `docs/PLAN_HARNESS.md` is in progress: phases 1 to 5 of 6 are done, apart from the live checks of phases 3 and 4, which wait for a backend on port 8000 running the new code.
+The agent's harness in `docs/PLAN_HARNESS.md` is built: phases 1 to 5 are done, including their live checks, and so are phase 6's documents. Phase 6's live trial found two problems, now fixed and tested with stub models; the live retest of those fixes is still to do (see "Last live run" and "Known limitations").
 
 The code review in `docs/HUMAN_REVIEW_HARNESS.md` is answered. The agent is restructured into `api.py`, `tools.py` and `harness.py`, both agents' instructions give a goal instead of a script, and the backend and the dashboard each keep their API prefix in one place. `docs/CODE_STANDARDS.md` (Structure and Agents) and `docs/PROCESS.md` (a design in every plan, and a review of every phase's diff before it's committed) now ask for what the review found missing.
 
@@ -34,4 +34,36 @@ The code review in `docs/HUMAN_REVIEW_HARNESS.md` is answered. The agent is rest
 
 ## Last live run
 
-On September 27, 2026, `uv run -m agent` with `openai/gpt-6-luna` worked all 25 claims in 2 minutes 47 seconds: 17 approve, 5 decline and 3 refer. Three approvals were over $1,000 and waited for sign-off (CLM-1003, CLM-1008 and CLM-1011), and every other approval was paid its payout. These decisions have not yet been scored against the handlers' decisions in `data/evals/`.
+On November 16, 2026, on a fresh database with the default model, `deepseek/deepseek-v4.1-flash`:
+
+- `uv run -m agent CLM-1005` approved the claim and paid $243.00 in 2 minutes 16 seconds. The claim agent read 14 of the 26 sections, 8 of them in the claims manual.
+- `uv run -m agent --cap 5`, watched on the queue page, worked the five longest-waiting claims in 13 minutes: CLM-1001, CLM-1008, CLM-1011, CLM-1018 and CLM-1010. The to-do list filled in and was ticked off, and the run finished with every item done and 20 claims still waiting.
+- A second capped run, started while the first was finishing, worked CLM-1010 again (see "Known limitations"), then CLM-1015, CLM-1003, CLM-1012 and CLM-1004, in 11 minutes.
+
+Nine claims were decided across the two runs, and 16 are still waiting:
+
+| Claim | Decision | Payout | Outcome |
+|---|---|---|---|
+| CLM-1001 | approve | $800.00 | Not paid. The payout should be $420.00 (below) |
+| CLM-1003 | approve | $3,750.00 | Waiting for sign-off |
+| CLM-1004 | approve | $186.00 | Paid |
+| CLM-1008 | approve | $2,240.00 | Waiting for sign-off |
+| CLM-1010 | decline | $0.00 | Worked by both runs |
+| CLM-1011 | approve | $1,150.00 | Waiting for sign-off |
+| CLM-1012 | decline | $0.00 | |
+| CLM-1015 | decline | $0.00 | |
+| CLM-1018 | refer | $0.00 | A required document is missing |
+
+Every decision names a section and gives a reason, though three of the reasons run to four sentences, one more than asked. Every approval over $1,000 waits for sign-off with no payment, and CLM-1004 was paid exactly its payout. Each claim agent read 8 to 14 sections, at least 4 of them in the claims manual. These decisions have not been scored against the handlers' decisions in `data/evals/`.
+
+The trial found two problems. Both are fixed, with tests on a stub model, but neither fix has been seen in a live run yet:
+
+- The to-do list lagged behind the claims. The queue agent handed over two claims at once, so it couldn't update the list until both came back, and for a few minutes the list showed a decided claim as In progress. `work_claim` now keeps each claim's item in step.
+- A claim agent recorded CLM-1001's decision with the plan's $800 Trip Delay maximum as the payout, then worked out that it should be $420 and tried to record it again. The backend refused the second decision, and refused to pay $420 against an $800 payout, so the claim stands approved at $800 and unpaid. The claim instructions now say that a recorded decision is final, so the checks and the payout come first.
+
+## Known limitations
+
+- Run one queue run at a time. A run starts by releasing every claim in progress, on the assumption that a stopped run left it, so a second run releases a claim the first is still working. In the trial, the second run released CLM-1010 and started it again, so two claim agents worked it at once, both recording steps on it. One recorded the decline, the other's decision was refused, and the claim used up both its attempts.
+- A run stopped with Ctrl+C, or whose process is killed, is never finished, and the queue page shows the agent still working until a newer run starts. Its claims in progress are released when the next run starts.
+- A recorded decision can't be changed, by the agent or by a handler, and the dashboard has no way to correct or flag one. An approval within the limit that the agent didn't pay, like CLM-1001, stays unpaid with nothing to prompt a handler.
+- A claim takes the default model about two minutes, mostly spent reading sections, so a run of five takes 11 to 13 minutes.

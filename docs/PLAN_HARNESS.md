@@ -229,8 +229,10 @@ Run the trial the brief describes, watch it in the browser, and bring the docume
 - [ ] Live: every decision has a section and a reason of two or three sentences. Every approval over $1,000 is `waiting_for_sign_off` with no payment, and every other approval is paid exactly its payout
 - [x] `docs/SPEC.md`: decisions follow the policy wording and the claims manual. The manual is out of "Not for now", and "What the team needs to see" includes the run's to-do list, the sections the agent read, and claims left for a handler
 - [x] `docs/TECH_STACK.md` describes the two agents, the middleware, the default model and the entry points
-- [ ] `docs/STATUS.md` describes what's built, how to run a capped run, a full run and a single claim, and the results of the live trial
-- [ ] `npm run check` passes
+- [x] `docs/STATUS.md` describes what's built, how to run a capped run, a full run and a single claim, and the results of the live trial
+- [x] `npm run check` passes
+
+The four live criteria stay open. The trial on November 16, 2026, in `docs/STATUS.md`, showed the to-do list filling in and ticked off, five claims worked with 20 still waiting, and claim pages with their steps and sections read (checked in the browser for CLM-1008). But CLM-1001 was approved at the wrong payout and not paid, and the fixes that followed haven't had a live run. The retest on a fresh database was put off, to keep the trial's database as it is.
 
 ## Not in this plan
 
